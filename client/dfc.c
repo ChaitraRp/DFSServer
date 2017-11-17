@@ -102,6 +102,7 @@ void readConfFile(int lineLimit){
 	char *value;
 	char readBuffer[200];
 	
+	sprintf(dfcConfigFilename,"%s","dfc.conf");
 	fp = fopen(dfcConfigFilename, "r");
 	if(fp == NULL){
 		perror("Error in opening dfc.conf file\n");
@@ -117,27 +118,27 @@ void readConfFile(int lineLimit){
 					value = strtok(readBuffer, " \t\n");
 					value = strtok(NULL, " \t\n");
 					
-					if(value[3] == "1"){
+					if(value[3] == '1'){
 						value = strtok(NULL, " \t\n");
 						strcpy(SERVERS[0], value);
 						i = 0;
 					}
-					if(value[3] == "2"){
+					if(value[3] == '2'){
 						value = strtok(NULL, " \t\n");
 						strcpy(SERVERS[1], value);
 						i = 1;
 					}
-					if(value[3] == "3"){
+					if(value[3] == '3'){
 						value = strtok(NULL, " \t\n");
 						strcpy(SERVERS[2], value);
 						i = 2;
 					}
-					if(value[3] == "4"){
+					if(value[3] == '4'){
 						value = strtok(NULL, " \t\n");
 						strcpy(SERVERS[3], value);
 						i = 3;
 					}
-					printf("SERVERS: %s\n", SERVERS[i]);
+					printf("SERVERS[%d]: %s\n", i, SERVERS[i]);
 					bzero(readBuffer, sizeof(readBuffer));
 					i = i%4;
 				}
@@ -175,6 +176,7 @@ void readConfFile(int lineLimit){
 int sendUserCredentials(int sockfd){
 	//read the file for username and password
 	readConfFile(0);
+	readConfFile(1);
 	
 	
 	
@@ -299,6 +301,9 @@ int main(int argc, char **argv){
 						perror("Error in send\n");
 				}
 			}
+			
+			//to test
+			//sendUserCredentials(sockfd[i]);
 			
 			#if 1
 			for(i=0; i<MAX_CONN; i++)
