@@ -77,11 +77,34 @@ int userMenu(){
 	return choice;
 }
 
+
+//-----------------------------READ DFC CONFIG FILE---------------------------------
+void readConfFile(int lineLimit){
+	
+}
+
+
+
+//-------------------------------SEND USER CREDENTIALS------------------------------
+int sendUserCredentials(int sockfd){
+	//first read the file
+	readConfFile(0);
+}
+
+
+
+
+//------------------------------------------MAIN-------------------------------------
 int main(int argc, char **argv){
 	int choice = 0;
 	int i;
 	int sendBytes;
 	int arrayOfFailedSend[MAX_CONN];
+	
+	char filenameGet[15];
+	char filenamePut[15];
+	char subDirectory[20];
+	
 	signal(SIGPIPE, SIG_IGN);
 	
 	
@@ -117,7 +140,90 @@ int main(int argc, char **argv){
 		}//end of choice == LIST
 		
 		else if(choice == GET){
+			for(i=0; i<MAX_CONN;i++){
+				int sendBytes = send(sockfd[i], (void*)&dummy, sizeof(int), 0);
+				if(sendBytes < 0){
+					arrayOfFailedSend[i] = TRUE;
+					perror("Error in sending User Choice\n");
+				}
+				else{
+					arrayOfFailedSend[i] = FALSE;
+					printf("\nOption sent!");
+				}
+			}
 			
+			printf("Enter the filename to recieve: ");
+			scanf("%s", filenameGet);
+			printf("Enter the Sub Directory: ");
+			scanf("%s", subDirectory);
+			printf("Filename: %s\nSubdirectory: %s\n", filenameGet, subDirectory);
+			
+			int serverForUse[MAX_CONN] = {-1,-1,-1,-1};
+			if(!arrayOfFailedSend[0]){
+				serverForUse[0] = TRUE;
+				if(!arrayOfFailedSend[2]){
+					serverForUse[2] = TRUE;
+					printf("COMPLETE 1\n")
+				}
+				else{
+					if(!arrayOfFailedSend[1] && !arrayOfFailedSend[3]){
+						serverForUse[1] = TRUE;
+						serverForUse[3] = TRUE;
+					}
+					else{
+						printf("INCOMPLETE 1\n")
+						//goto GET_END;
+					}
+				}
+			}
+			else if(!arrayOfFailedSend[1]){
+				serverForUse[1] = TRUE;
+				if(!arrayOfFailedSend[3]){
+					serverForUse[3] = TRUE;
+					printf("COMPLETE 2\n");
+				}
+				else{
+					printf("INCOMPLETE 2\n");
+					//goto GET_END;
+				}
+			}
+			else{
+				printf("INCOMPLETE 3\n")
+				//goto GET_END;
+			}
+			
+			for(i=0; i<MAX_CONN; i++)
+				printf("serverForUse[%d] = %d\n", i, serverForUse[i]);
+			
+			int start;
+			for(i=0; i<MAX_CONN; i++){
+				if(serverForUse[i] == TRUE){
+					start = TRUE;
+					int sendBytes = send(sockfd[i], (void*)&start, sizeof(int), 0);
+					if(sendBytes < 0)
+						perror("Error in send\n");
+				}
+				else{
+					start = FALSE;
+					int sendBytes = send(sockfd[i], (void*)&start, sizeof(int), 0);
+					if(sendBytes < 0)
+						perror("Error in send\n");
+				}
+			}
+			
+			#if 1
+			for(i=0; i<MAX_CONN; i++)
+				#else
+					for(i=0; i<1; i++)
+			#endif
+			{
+				if(serverForUse[i] == TRUE){
+					if(sendUserCredentials(sockfd[i])){
+						
+					}
+				}
+			}//end of double for loop
+
 		}//end of choice == GET
 		
 		else if(choice == PUT){
