@@ -174,12 +174,97 @@ void readConfFile(int lineLimit){
 
 //-------------------------------SEND USER CREDENTIALS------------------------------
 int sendUserCredentials(int sockfd){
+	int ack;
 	//read the file for username and password
 	readConfFile(0);
-	readConfFile(1);
 	
+	//send username and password to server
+	int sendBytes = send(sockfd, USERNAME, 20, 0);
+	if(sendBytes < 0)
+		perror("Error in sending Username\n");
 	
+	int sendBytes = send(sockfd, PASSWORD, 20, 0);
+	if(sendBytes < 0)
+		perror("Error in sending Password\n");
 	
+	int recvBytes = recv(sockfd, &ack, sizeof(int), 0);
+	if(recvBytes < 0)
+		perror("Error in receiving ack\n");
+	
+	if(!ack){
+		printf("INVALID USERNAME OR PASSWORD");
+		return FAIL;
+	}
+	
+	return PASS;
+}
+
+
+
+//---------------------------------RECEIVE FILE (GET)-------------------------------
+int receiveFile(int sockfd, char *filenameGet, struct sockaddr_in serverAddress, socklen_t serverLength, char *subDirectory){
+	int status;
+	int fileSize = 0;
+	int receivedSize = 0;
+	int recvBytes = 0;
+	int writtenSize = 0;
+	char receivedFilename[100];
+	char *readBuffer;
+	readBuffer = malloc(400000);
+	FILE *fp;
+	
+	//send the subDirectory
+	if(send(sockfd, subDirectory, 100, 0) < 0)
+		perror("Error in sending subDirectory\n");
+	
+	//receive the filename from the server
+	bzero(receivedFilename, sizeof(receivedFilename));
+	if(recv(sockfd, receivedFilename, sizeof(receivedFilename), 0) < 0)
+		perror("Error in receiving filename\n");
+	
+	if(recv(sockfd, &status, sizeof(int), 0) < 0)
+		perror("Error in receiving file status\n");
+	
+	if(status == 0)
+		printf("FILE DOES NOT EXIST ON SERVER\n!");
+	
+	if(status == 1 || status == -1){
+		//receive the filesize
+		if(recv(sockfd, &fileSize, sizeof(int), 0) < 0)
+			perror("Error in receiving file size\n");
+		
+		printf("fileSize: %d\n", fileSize);
+		strncat(receivedFilename, "_get", 100);
+		printf("receivedFilename: %s\n", receivedFilename);
+		
+		//open the file to write into it
+		fp = fopen(receivedFilename, "w");
+		if(fp == NULL){
+			printf("Error in opening the receivedFilename\n");
+			return -1;
+		}
+
+		//start receiving the file
+		while(receivedSize < fileSize){
+			recvBytes = recv(sockfd, readBuffer, 400000, 0);
+			if(recvBytes == 0){
+				perror("Error in reading file\n");
+				break;
+			}
+			printf("Size of the file: %d\n", fileSize);
+			printf("Number of bytes read now: %d\n", recvBytes);
+			
+			writtenSize = fwrite(readBuffer, 1, recvBytes, fp);
+			printf("Size of the file written: %d", writtenSize);
+			
+			receivedSize = receivedSize + recvBytes;
+			printf("Total size of the file received so far: %d\n\n", receivedSize);
+		}
+		fclose(fp);
+		return PASS;
+	}
+	else
+		return FAIL;
 }
 
 
@@ -191,6 +276,7 @@ int main(int argc, char **argv){
 	int i;
 	int sendBytes;
 	int arrayOfFailedSend[MAX_CONN];
+	int receiveFileStatus = 0;
 	
 	char filenameGet[15];
 	char filenamePut[15];
@@ -226,10 +312,14 @@ int main(int argc, char **argv){
 		int j;
 		int dummy = 100;
 		
+		
+		//------------------------CHOICE == LIST----------------------------------
 		if(choice == LIST){
 			
 		}//end of choice == LIST
 		
+		
+		//------------------------CHOICE == GET----------------------------------
 		else if(choice == GET){
 			for(i=0; i<MAX_CONN;i++){
 				int sendBytes = send(sockfd[i], (void*)&dummy, sizeof(int), 0);
@@ -313,13 +403,74 @@ int main(int argc, char **argv){
 			{
 				if(serverForUse[i] == TRUE){
 					if(sendUserCredentials(sockfd[i])){
+						//SEND_RECV 1
+						if(send(sockfd[i], filenameGet, 50, 0) < 0)
+							perror("Error in sending filename for get\n");
 						
+						receiveFileStatus = receiveFile(sockfd[i], filenameGet, serverAddress[i], serverLength[i], subDirectory);
+
+						//SEND_RECV 2
+						if(send(sockfd[i], filenameGet, 50, 0) < 0)
+							perror("Error in sending the  file");
+						
+						receiveFileStatus = receiveFile(sockfd[i], filenameGet, serverAddress[i], serverLength[i], subDirectory);
 					}
 				}
 			}//end of double for loop
 
+			for (i=0; i<MAX_CONN; i++)
+				serverForUse[i] = -1;
+			
+			char systemListGetFile[100];
+			char decryptCommand[300];
+			char fileList[4][100];
+			char fileLS[100];
+			i = 0;
+			bzero(systemListGetFile, sizeof(systemListGetFile));
+			
+			strncpy(systemListGetFile, "ls -a .", strlen("ls -a ."));
+			strncat(systemListGetFile, filenameGet, strlen(filenameGet));
+			strncat(systemListGetFile, "*_get*", strlen("*_get*"));
+			printf("systemListFiles: %s\n", systemListFiles);
+			
+			FILE *filepointer = popen(systemListFiles, "r");
+			while(fgets(fileLS, 100, filepointer) != NULL){
+				bzero(fileList[i], sizeof(fileList[i]));				
+				strtok(fileLS, " \t\n");
+				strncpy(fileList[i], fileLS, sizeof(fileLS));
+				i++;
+			}
+			pclose(filepointer);
+			
+			bzero(decryptCommand, sizeof(decryptCommand));
+			readConfFile(0);
+			if(i < MAX_CONN)
+				printf("INCOMPLETE FILE\n");
+			else{
+				char catFilePiecesCommand[300];
+				for(i=0; i < MAX_CONN; i++){
+					sprintf(decryptCommand, "openssl enc -d -aes-256-cbc -in %s-out de%s -k %s", fileList[i], fileList[i], PASSWORD);
+					system(decryptCommand);
+				}
+				
+				sprintf(catFilePiecesCommand, "cat de%s de%s de%s de%s > %s_get", fileList[0], fileList[1], fileList[2], fileList[3],  filenameGet);
+				system(catFilePiecesCommand);
+				printf("FILE CONCATENATION: SUCCESS");
+				bzero(catFilePiecesCommand, sizeof(catFilePiecesCommand));
+				//can remove files using rm command here
+			}
+			
+			
+			//bzero everything
+			bzero(decryptCommand, sizeof(decryptCommand));
+			for(i=0; i<MAX_CONN, i++)
+				bzero(fileList[i], sizeof(fileList[i]));
+			
+			printf("\nDONE WITH GET FUNCTION\n");
 		}//end of choice == GET
 		
+		
+		//------------------------CHOICE == PUT----------------------------------
 		else if(choice == PUT){
 			
 		}//end of choice == PUT
