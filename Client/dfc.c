@@ -34,6 +34,10 @@ int sockfd[MAX_CONN];
 int serverSize = sizeof(serverAddress);
 struct hostent *server;
 
+char dfcConfigFilename[50];
+char USERNAME[20];
+char PASSWORD[20];
+
 
 //--------------------------------------USER MENU------------------------------------
 int userMenu(){
@@ -78,9 +82,58 @@ int userMenu(){
 }
 
 
+
+//--------------------------------GET FILE SIZE------------------------------------
+int getFileSize(FILE *fp){
+	int fileSize;
+	fseek(fp, 0L, SEEK_END);
+	fileSize = ftell(fp);
+	fseek(fp, 0L, SEEK_SET);
+	return fileSize;
+}
+
+
+
 //-----------------------------READ DFC CONFIG FILE---------------------------------
 void readConfFile(int lineLimit){
+	FILE *fp;
+	char *value;
+	char readBuffer[200];
 	
+	fp = fopen(dfcConfigFilename, "r");
+	if(fp == NULL){
+		perror("Error in opening dfc.conf file\n");
+		exit(1);
+	}
+	else{
+		int dfcConfigFileSize = getFileSize(fp);
+		while(fgets(readBuffer, dfcConfigFileSize, fp) != NULL){
+			if(check){
+				
+			}
+			else{
+				//Fetch USERNAME
+				if(strncmp(readBuffer, "Username", 8) == 0){
+					printf("readBuffer: %s\n", readBuffer);
+					value = strtok(readBuffer, " \t\n");
+					value = strtok(NULL, " \t\n");
+					strcpy(USERNAME, value);
+					printf("USERNAME: %s\n", USERNAME);
+					bzero(readBuffer, sizeof(readBuffer));
+				}
+				
+				//Fetch PASSWORD
+				if(strncmp(readBuffer, "Password", 8) == 0){
+					printf("readBuffer: %s\n", readBuffer);
+					value = strtok(readBuffer, " \t\n");
+					value = strtok(NULL, " \t\n");
+					strcpy(PASSWORD, value);
+					printf("PASSWORD: %s\n", PASSWORD);
+					bzero(readBuffer, sizeof(readBuffer));
+				}
+			}//end of else to fetch un pwd
+		}//end of while
+	}//end of if dfc.conf opens successfully
 }
 
 
