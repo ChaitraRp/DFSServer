@@ -37,6 +37,7 @@ struct hostent *server;
 char dfcConfigFilename[50];
 char USERNAME[20];
 char PASSWORD[20];
+char SERVERS[4][50];
 
 
 //--------------------------------------USER MENU------------------------------------
@@ -50,7 +51,7 @@ int userMenu(){
 		printf("PUT: upload a file to the server\n");
 		printf("GET: get a file from the server\n");
 		printf("EXIT: close the connection\n");
-		printf("\n----------------------------------------------\n\n");
+		printf("----------------------------------------------\n\n");
 		
 		printf("Please enter a command:  ");
 		scanf("%s", command);
@@ -97,6 +98,7 @@ int getFileSize(FILE *fp){
 //-----------------------------READ DFC CONFIG FILE---------------------------------
 void readConfFile(int lineLimit){
 	FILE *fp;
+	int i = 0;
 	char *value;
 	char readBuffer[200];
 	
@@ -108,7 +110,37 @@ void readConfFile(int lineLimit){
 	else{
 		int dfcConfigFileSize = getFileSize(fp);
 		while(fgets(readBuffer, dfcConfigFileSize, fp) != NULL){
-			if(check){
+			if(lineLimit){
+				//Fetch DFS Server Details
+				if((strncmp(readBuffer,"Server",6)==0) || (strncmp(readBuffer,"SERVER",6)==0)){
+					printf("readBuffer: %s\n", readBuffer);
+					value = strtok(readBuffer, " \t\n");
+					value = strtok(NULL, " \t\n");
+					
+					if(value[3] == "1"){
+						value = strtok(NULL, " \t\n");
+						strcpy(SERVERS[0], value);
+						i = 0;
+					}
+					if(value[3] == "2"){
+						value = strtok(NULL, " \t\n");
+						strcpy(SERVERS[1], value);
+						i = 1;
+					}
+					if(value[3] == "3"){
+						value = strtok(NULL, " \t\n");
+						strcpy(SERVERS[2], value);
+						i = 2;
+					}
+					if(value[3] == "4"){
+						value = strtok(NULL, " \t\n");
+						strcpy(SERVERS[3], value);
+						i = 3;
+					}
+					printf("SERVERS: %s\n", SERVERS[i]);
+					bzero(readBuffer, sizeof(readBuffer));
+					i = i%4;
+				}
 				
 			}
 			else{
@@ -133,6 +165,7 @@ void readConfFile(int lineLimit){
 				}
 			}//end of else to fetch un pwd
 		}//end of while
+		fclose(fp);
 	}//end of if dfc.conf opens successfully
 }
 
@@ -140,8 +173,11 @@ void readConfFile(int lineLimit){
 
 //-------------------------------SEND USER CREDENTIALS------------------------------
 int sendUserCredentials(int sockfd){
-	//first read the file
+	//read the file for username and password
 	readConfFile(0);
+	
+	
+	
 }
 
 
@@ -205,7 +241,7 @@ int main(int argc, char **argv){
 				}
 			}
 			
-			printf("Enter the filename to recieve: ");
+			printf("Enter the filename to receive: ");
 			scanf("%s", filenameGet);
 			printf("Enter the Sub Directory: ");
 			scanf("%s", subDirectory);
@@ -216,7 +252,7 @@ int main(int argc, char **argv){
 				serverForUse[0] = TRUE;
 				if(!arrayOfFailedSend[2]){
 					serverForUse[2] = TRUE;
-					printf("COMPLETE 1\n")
+					printf("COMPLETE 1\n");
 				}
 				else{
 					if(!arrayOfFailedSend[1] && !arrayOfFailedSend[3]){
@@ -224,7 +260,7 @@ int main(int argc, char **argv){
 						serverForUse[3] = TRUE;
 					}
 					else{
-						printf("INCOMPLETE 1\n")
+						printf("INCOMPLETE 1\n");
 						//goto GET_END;
 					}
 				}
@@ -241,7 +277,7 @@ int main(int argc, char **argv){
 				}
 			}
 			else{
-				printf("INCOMPLETE 3\n")
+				printf("INCOMPLETE 3\n");
 				//goto GET_END;
 			}
 			
