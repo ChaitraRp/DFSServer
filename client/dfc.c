@@ -312,7 +312,24 @@ void createSockets(){
 
 
 
+//-------------------------------CALCULATE MD5SUM------------------------------------
+void calculateMD5(char *filenamePut, char md5sum[100]){
+	char MD5Command[50];
+	FILE *fp;
+	strncpy(MD5Command, "md5sum", sizeof("md5sum "));
+	strncat(MD5Command, filenamePut, strlen(filenamePut));
+	
+	fp = popen(MD5Command, "r");
+	while(fgets(md5sum, 100, fp) != NULL)
+		strtok(md5sum, " \t\n");
+	pclose(fp);
+}
 
+
+
+
+//Ref: To split the file into equal parts - http://www.theunixschool.com/2012/10/10-examples-of-split-command-in-unix.html
+//Ref: To do AES encryption - https://askubuntu.com/questions/60712/how-do-i-quickly-encrypt-a-file-with-aes
 //------------------------------------------MAIN-------------------------------------
 int main(int argc, char **argv){
 	int choice = 0;
@@ -320,14 +337,19 @@ int main(int argc, char **argv){
 	int sendBytes;
 	int arrayOfFailedSend[MAX_CONN];
 	int receiveFileStatus = 0;
+	int md5int;
+	int md5Index;
 	
 	char filenameGet[15];
 	char filenamePut[15];
 	char subDirectory[20];
+	char md5sum[100];
 	
 	signal(SIGPIPE, SIG_IGN);
 	readConfFile(1);
 	createSockets();
+	
+	FILE *fp;
 	
 	
 	while(1){
@@ -511,7 +533,82 @@ int main(int argc, char **argv){
 		
 		//------------------------CHOICE == PUT----------------------------------
 		else if(choice == PUT){
+			printf("Enter the name of the file you want to send: ");
+			scanf("%s", filenamePut);
+			printf("Enter the  name of the sub directory: ");
+			scanf("%s", subDirectory);
 			
+			printf("filenamePut: %s", filenamePut);
+			printf("sub directory: %s", subDirectory);
+			
+			if(!(fp = fopen(filenamePut, "r")))
+				perror("Error in opening the file\n");
+			
+			printf("Step: Calculating MD5sum\n");
+			calculateMD5(filenamePut, md5sum);
+			md5int = md5sum[strlen(md5sum)-1] % 4;
+			md5Index = (4-md5int)%4;
+			printf("md5Index: %d\n",  md5Index);
+			
+			printf("Step: Divide the file into four parts\n");
+			char sysCmd[100];
+			char fname[100];
+			bzero(fname, sizeof(fname));
+			strncpy(fname, filenamePut, sizeof(filenamePut));
+			strncpy(fname, filenamePut, strlen(filenamePut));
+			sprintf(sysCmd, "split -n 4 -a 1 -d %s en%s", filenamePut, filenamePut);
+			printf("%s\n", sysCmd);
+			system(sysCmd);
+			
+			printf("Step: Encrypting file using AES\n");
+			char encryptCmd[100];
+			bzero(encryptCmd, sizeof(encryptCmd));
+			readConfFile(0); //to fetch password
+			for(i=0; i<MAX_CONN; i++){
+				sprintf(encryptCmd, "openssl enc -aes-256-cbc -in en%s%d -out %s%d -k %s", filenamePut, i, filenamePut, i, PASSWORD);
+				system(encryptCmd);
+			}
+			
+			char fnameIndex[4][100];
+			char fIndex[1];
+			int finalIndex;
+			#if 1
+			for(i=0; i<MAX_CONN; i++)
+			#else
+			for(i=0; i<1; i++)
+			#endif
+			{
+				if(!arrayOfFailedSend[i]){
+					if(sendUserCredentials(sockfd[i])){
+						//sending first piece of file
+						printf("Step: Calculating index for first piece of file\n")
+						finalIndex = (i + md5Index) % 4;
+						strncpy(fnameIndex[finalIndex], filenamePut, sizeof(filenamePut));
+						sprintf(fIndex, "%d", finalIndex);
+						printf("File Index: %s\n", fIndex);
+						strncat(fnameIndex[finalIndex], fIndex, 1);
+						printf("Filename: %s\n", fnameIndex[fIndex]);
+						printf("Step: Sending first piece of file\n");
+						sendFile(sockfd[i], fnameIndex[finalIndex], serverAddress[i], subDirectory);
+						sleep(1);
+						
+						//sending second piece of file
+						printf("Step: Calculating index for second piece of file\n")
+						strncpy(fnameIndex[(finalIndex+1)%4], filenamePut, sizeof(filenamePut));
+						sprintf(fIndex, "%d", (finalIndex+1)%4);
+						printf("File Index: %s\n", fIndex);
+						strncat(fnameIndex[(finalIndex+1)%4], fIndex, 1);
+						printf("Filename: %s\n", fnameIndex[(finalIndex+1)%4]);
+						printf("Step: Sending second piece of file\n");
+						sendFile(sockfd[i], fnameIndex[finalIndex], serverAddress[i], subDirectory);
+						
+						//bzero everything
+						bzero(fnameIndex[finalIndex], sizeof(fnameIndex[finalIndex]));
+						bzero(fnameIndex[(finalIndex+1)%4], sizeof(fnameIndex[(finalIndex+1)%4]));
+						bzero(fIndex, sizeof(fIndex));
+					}
+				}
+			}
 		}//end of choice == PUT
 		
 		
