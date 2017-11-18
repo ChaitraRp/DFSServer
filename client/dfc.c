@@ -28,16 +28,20 @@
 #define EXIT 4
 
 #define MAX_CONN 4
+#define TIMEOUT 1
+
 struct sockaddr_in serverAddress[MAX_CONN];
 socklen_t serverLength[MAX_CONN];
 int sockfd[MAX_CONN];
 int serverSize = sizeof(serverAddress);
-struct hostent *server;
+struct hostent *SERVERNAME;
 
 char dfcConfigFilename[50];
 char USERNAME[20];
 char PASSWORD[20];
 char SERVERS[4][50];
+
+int PORT;
 
 
 //--------------------------------------USER MENU------------------------------------
@@ -147,7 +151,7 @@ void readConfFile(int lineLimit){
 			else{
 				//Fetch USERNAME
 				if(strncmp(readBuffer, "Username", 8) == 0){
-					printf("readBuffer: %s\n", readBuffer);
+					//printf("readBuffer: %s\n", readBuffer);
 					value = strtok(readBuffer, " \t\n");
 					value = strtok(NULL, " \t\n");
 					strcpy(USERNAME, value);
@@ -157,7 +161,7 @@ void readConfFile(int lineLimit){
 				
 				//Fetch PASSWORD
 				if(strncmp(readBuffer, "Password", 8) == 0){
-					printf("readBuffer: %s\n", readBuffer);
+					//printf("readBuffer: %s\n", readBuffer);
 					value = strtok(readBuffer, " \t\n");
 					value = strtok(NULL, " \t\n");
 					strcpy(PASSWORD, value);
@@ -179,23 +183,19 @@ int sendUserCredentials(int sockfd){
 	readConfFile(0);
 	
 	//send username and password to server
-	int sendBytes = send(sockfd, USERNAME, 20, 0);
-	if(sendBytes < 0)
+	if(send(sockfd, USERNAME, 20, 0) < 0)
 		perror("Error in sending Username\n");
 	
-	int sendBytes = send(sockfd, PASSWORD, 20, 0);
-	if(sendBytes < 0)
+	if(send(sockfd, PASSWORD, 20, 0) < 0)
 		perror("Error in sending Password\n");
 	
-	int recvBytes = recv(sockfd, &ack, sizeof(int), 0);
-	if(recvBytes < 0)
+	if(recv(sockfd, &ack, sizeof(int), 0) < 0)
 		perror("Error in receiving ack\n");
 	
 	if(!ack){
 		printf("INVALID USERNAME OR PASSWORD");
 		return FAIL;
 	}
-	
 	return PASS;
 }
 
@@ -269,6 +269,49 @@ int receiveFile(int sockfd, char *filenameGet, struct sockaddr_in serverAddress,
 
 
 
+//--------------------------------SOCKET CREATION-----------------------------------
+
+//Ref: https://en.wikibooks.org/wiki/C_Programming/Networking_in_UNIX
+//Ref: https://courses.cs.washington.edu/courses/cse476/02wi/labs/lab1/client.c
+//Ref: https://stackoverflow.com/questions/4181784/how-to-set-socket-timeout-in-c-when-making-multiple-connections
+void createSockets(){
+	char *serverName;
+	char *port;
+	
+	for(int i=0; i<MAX_CONN; i++){
+		serverLength[i] = sizeof(serverAddress[i]);
+		serverName = strtok(SERVERS[i], ":");
+		port = strtok(NULL, "");
+		printf("Server: %s\n", serverName);
+		printf("PORT: %s\n", port);
+		PORT = atoi(port);
+		
+		//create socket
+		if((sockfd[i] = socket(AF_INET, SOCK_STREAM, 0)) == -1)
+			perror("Error creating the socket\n");
+		
+		//set up the address structure
+		SERVERNAME = gethostbyname(serverName);
+		memset((char*) &serverAddress[i], 0, sizeof(serverAddress[i]));
+		serverAddress[i].sin_family = AF_INET;
+		serverAddress[i].sin_port = htons(PORT);
+		bcopy((char*)SERVERNAME->h_addr, (char*)&serverAddress[i].sin_addr.s_addr, SERVERNAME->h_length);
+		
+		//connect to server
+		if(connect(sockfd[i], (struct sockaddr *)&serverAddress[i], sizeof(serverAddress[i])) < 0)
+			perror("Error in connecting to the socket\n");
+		
+		struct timeval timeout;
+		timeout.tv_sec = TIMEOUT;
+		timeout.tv_usec = 0;
+		
+		if(setsockopt(sockfd[i], SOL_SOCKET, SO_RCVTIMEO, (char*)&timeout, sizeof(timeout)) < 0)
+			perror("Error in setsockopt()\n");			
+	}//end of for
+}
+
+
+
 
 //------------------------------------------MAIN-------------------------------------
 int main(int argc, char **argv){
@@ -283,6 +326,8 @@ int main(int argc, char **argv){
 	char subDirectory[20];
 	
 	signal(SIGPIPE, SIG_IGN);
+	readConfFile(1);
+	createSockets();
 	
 	
 	while(1){
@@ -431,9 +476,9 @@ int main(int argc, char **argv){
 			strncpy(systemListGetFile, "ls -a .", strlen("ls -a ."));
 			strncat(systemListGetFile, filenameGet, strlen(filenameGet));
 			strncat(systemListGetFile, "*_get*", strlen("*_get*"));
-			printf("systemListFiles: %s\n", systemListFiles);
+			printf("systemListFiles: %s\n", systemListGetFile);
 			
-			FILE *filepointer = popen(systemListFiles, "r");
+			FILE *filepointer = popen(systemListGetFile, "r");
 			while(fgets(fileLS, 100, filepointer) != NULL){
 				bzero(fileList[i], sizeof(fileList[i]));				
 				strtok(fileLS, " \t\n");
@@ -463,7 +508,7 @@ int main(int argc, char **argv){
 			
 			//bzero everything
 			bzero(decryptCommand, sizeof(decryptCommand));
-			for(i=0; i<MAX_CONN, i++)
+			for(i=0; i<MAX_CONN; i++)
 				bzero(fileList[i], sizeof(fileList[i]));
 			
 			printf("\nDONE WITH GET FUNCTION\n");
