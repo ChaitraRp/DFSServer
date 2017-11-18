@@ -453,12 +453,6 @@ int main(int argc, char **argv){
 							perror("Error in sending filename for get\n");
 						
 						receiveFileStatus = receiveFile(sockfd[i], filenameGet, serverAddress[i], serverLength[i], subDirectory);
-
-						//SEND_RECV 2
-						if(send(sockfd[i], filenameGet, 50, 0) < 0)
-							perror("Error in sending the  file");
-						
-						receiveFileStatus = receiveFile(sockfd[i], filenameGet, serverAddress[i], serverLength[i], subDirectory);
 					}
 				}
 			}//end of double for loop
