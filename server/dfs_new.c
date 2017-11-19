@@ -34,6 +34,8 @@
 
 #define MAX_CONN 4
 #define TIMEOUT 1
+#define FIRSTFILE 0
+#define SECONDFILE 1
 
 typedef struct credentials{
   char USERNAME[100];
@@ -43,11 +45,11 @@ typedef struct credentials{
 credentials USERDATA;
 
 char dfsConfigFilename[100];
-
+int PORT;
   
 
   
-//----------------------------------GET FILE SIZE------------------------------------
+//--------------------------------GET FILE SIZE------------------------------------
 static unsigned int getFileSize(FILE *fp){
 	unsigned int fileSize;
 	fseek(fp, 0L, SEEK_END);
@@ -130,7 +132,7 @@ int send_image(int sockfd, char *filename, struct sockaddr_in clientAddress, int
    // send_buffer: buffer to send the packet read_buffer: reads the message server
 
 
-   size_t  read_size, stat; 
+   size_t  read_size, recvBytes; 
    int packet_index, size;
    struct timeval timeout = {2,0}; // determines the timeout
    char send_buffer[1024], read_buffer[256];
@@ -153,8 +155,8 @@ int send_image(int sockfd, char *filename, struct sockaddr_in clientAddress, int
   char name[256][256];
 
   // receive the subDirectory name
-  stat = recv(sockfd, subDirectory, 100, 0);  // reading the filename 
-  if (stat < 0)
+  recvBytes = recv(sockfd, subDirectory, 100, 0);  // reading the filename 
+  if (recvBytes < 0)
   {
     perror("Error receiving subDirectory");
   }
@@ -239,7 +241,7 @@ int send_image(int sockfd, char *filename, struct sockaddr_in clientAddress, int
 
   // copies the current list of files in to the array name[count]
   //printf("************************************\n");
-  int filestatus = -5;
+  int filerecvBytesus = -5;
   if (fileNumber != -1)
   {
     d = opendir(dirToOpenWithUser);
@@ -271,12 +273,12 @@ int send_image(int sockfd, char *filename, struct sockaddr_in clientAddress, int
     else
     {
       printf("FILE NOT FOUND serious issue\n");
-      //filestatus = 0;
+      //filerecvBytesus = 0;
     }
     
     if (count == 0)
     {
-    filestatus = 0;
+    filerecvBytesus = 0;
     }
   }
 
@@ -323,7 +325,7 @@ int send_image(int sockfd, char *filename, struct sockaddr_in clientAddress, int
    bzero(checkFileExists, sizeof(checkFileExists));
    printf("fileNumber %d\n", fileNumber);
 
-   if (filestatus == 0)
+   if (filerecvBytesus == 0)
    {
     printf("FILE UNAVAILABLE\n");
    }
@@ -342,9 +344,9 @@ int send_image(int sockfd, char *filename, struct sockaddr_in clientAddress, int
       if (access (checkFileExists, F_OK) != -1)
        {
         printf("FILE EXISTS\n");
-          filestatus = 1;
-           send(sockfd, (void *)&filestatus, sizeof(int), 0);
-          if (stat < 0)
+          filerecvBytesus = 1;
+           send(sockfd, (void *)&filerecvBytesus, sizeof(int), 0);
+          if (recvBytes < 0)
          {
           perror("Error sending size");
           exit(1);
@@ -353,10 +355,10 @@ int send_image(int sockfd, char *filename, struct sockaddr_in clientAddress, int
        }
        else
        {
-        filestatus = 0;
+        filerecvBytesus = 0;
         printf("FILE NOT EXISTS\n");
-           send(sockfd, (void *)&filestatus, sizeof(int), 0);
-          if (stat < 0)
+           send(sockfd, (void *)&filerecvBytesus, sizeof(int), 0);
+          if (recvBytes < 0)
          {
           perror("Error sending size");
           exit(1);
@@ -367,9 +369,9 @@ int send_image(int sockfd, char *filename, struct sockaddr_in clientAddress, int
    }
    else
    {
-    filestatus = -1;
-               send(sockfd, (void *)&filestatus, sizeof(int), 0);
-          if (stat < 0)
+    filerecvBytesus = -1;
+               send(sockfd, (void *)&filerecvBytesus, sizeof(int), 0);
+          if (recvBytes < 0)
          {
           perror("Error sending size");
           exit(1);
@@ -377,7 +379,7 @@ int send_image(int sockfd, char *filename, struct sockaddr_in clientAddress, int
 
    }
 
-   if (filestatus == 1 || filestatus == -1)
+   if (filerecvBytesus == 1 || filerecvBytesus == -1)
    {
       if (!(picture = fopen(dfsMainFolder, "r"))) 
       {
@@ -395,7 +397,7 @@ int send_image(int sockfd, char *filename, struct sockaddr_in clientAddress, int
 
        printf("Sending Picture Size from Server to Client\n");
        send(sockfd, (void *)&size, sizeof(int), 0);
-        if (stat < 0)
+        if (recvBytes < 0)
        {
         perror("Error sending size");
         exit(1);
@@ -410,10 +412,10 @@ int send_image(int sockfd, char *filename, struct sockaddr_in clientAddress, int
 
           do{
        
-                stat = send(sockfd, send_buffer, read_size, 0);//, (struct sockaddr *)&clientAddr, sizeof(clientAddr));
+                recvBytes = send(sockfd, send_buffer, read_size, 0);//, (struct sockaddr *)&clientAddr, sizeof(clientAddr));
 
       
-          }while (stat < 0);
+          }while (recvBytes < 0);
 
           printf(" \n");
           printf(" \n");
@@ -441,7 +443,6 @@ int receiveFile(int sockfd, struct sockaddr_in clientAddress, socklen_t clientSi
 	int recvSize = 0;
 	int recvBytes = 0;
 	int writtenBytes;
-	int stat = 0;
 
 	char fname[100];
 	char subDirectory[100];
@@ -450,26 +451,28 @@ int receiveFile(int sockfd, struct sockaddr_in clientAddress, socklen_t clientSi
 	char dfsUserFolder[150];
 	char dfsUsernameAndSubFolder[200];
 	char fndot[100];
+	char filenamePut[50];
+	char filenameGet[50];
 	char *receiveBuffer;
 	receiveBuffer = malloc(300241);
 
 	FILE *fp;
 
 	printf("Step: Receiving file size\n");
-	stat = recv(sockfd, &fSize, sizeof(int), 0);
-	if(stat < 0)
+	recvBytes = recv(sockfd, &fSize, sizeof(int), 0);
+	if(recvBytes < 0)
 		perror("Error in receiving the file size\n");
 	printf("file size: %d\n", fSize);
 
 	printf("Step: Receiving file name\n");
-	stat = recv(sockfd, fname, 100, 0);
-	if(stat < 0)
+	recvBytes = recv(sockfd, fname, 100, 0);
+	if(recvBytes < 0)
 		perror("Error in receiving the file name\n");
 	printf("file name: %s\n", fname);
 
 	printf("Step: Receiving subDirectory\n");
-	stat = recv(sockfd, subDirectory, 100, 0);
-	if (stat < 0)
+	recvBytes = recv(sockfd, subDirectory, 100, 0);
+	if (recvBytes < 0)
 		perror("Error in receiving the subDirectory\n");
 	printf("subDirectory: %s\n", subDirectory);
 	
@@ -558,200 +561,168 @@ int receiveFile(int sockfd, struct sockaddr_in clientAddress, socklen_t clientSi
 
 
 
+//----------------------------------MAIN------------------------------------
+//Ref: https://stackoverflow.com/questions/30356043/finding-ip-address-of-client-and-server-in-socket-programming
+int main(int argc, char **argv){
+	signal(SIGPIPE, SIG_IGN);
+  
+	int sockfd;
+	int acceptSock;
+	int n;
+	int option;
+	int recvBytes;
+	int portIndex;
+	int start;
+	int dummy;
+  
+	char buffer[256];
+	char filenameGet[15];
+	
+	struct sockaddr_in serverAddress, clientAddress;
+	socklen_t clientSize;
+	char fileNameList[10];
+  
+	if(argc < 3){
+		fprintf(stderr, "port number or config file is missing in arguments\n");
+		exit(1);
+	}
+	
+	printf("Step: Getting index from port number\n");
+	PORT = atoi(argv[1]);
+	portIndex = PORT%5;
+	printf("PortIndex: %d\n", portIndex);
+	
+	printf("Step: Verifying dfs.conf file\n");
+	sprintf(dfsConfigFilename,"%s",argv[2]);
+	FILE *fp;
+	fp=fopen(dfsConfigFilename,"r");
+	if (fp == NULL){
+		perror(dfsConfigFilename);
+		exit(1);
+	}
+	fclose(fp);
+  
+	//create socket
+	sockfd = socket(AF_INET, SOCK_STREAM, 0);
+	if(sockfd < 0)
+		perror("ERROR opening socket");
+	bzero((char *) &serverAddress, sizeof(serverAddress));
+	serverAddress.sin_family = AF_INET;
+	serverAddress.sin_addr.s_addr = INADDR_ANY;
+	serverAddress.sin_port = htons(PORT);
+	if(bind(sockfd, (struct sockaddr *) &serverAddress, sizeof(serverAddress)) < 0) 
+		perror("ERROR on binding");
+    
+	printf("Step: Server started\n");
+	listen(sockfd,5);
+	clientSize = sizeof(clientAddress);
+	acceptSock = accept(sockfd,(struct sockaddr *) &clientAddress, &clientSize);
+	if(acceptSock < 0)
+		perror("ERROR on accept");
 
-
-
-/*****************************************************************
- * main() starts the operations based on the commands
- 
- ARGUMENTS
- int argc     - argument count  
- char **argv  - [PORT NUMBER]
- ******************************************************************/
-
-#define FIRSTFILE 0
-#define SECONDFILE 1
-int main(int argc, char **argv)
-{
-
-  signal(SIGPIPE, SIG_IGN);
-  int sockfd, newsockfd, portno;
-  socklen_t clientSize;
-  char buffer[256];
-  struct sockaddr_in servAddr, clientAddress;
-  int listDummy;
-  int n;
-  char fileNameList[10];
-  if (argc < 3) {
-     fprintf(stderr,"ERROR, no port provided or config file missing\n");
-     exit(1);
-  }
-  sprintf(dfsConfigFilename,"%s",argv[2]);
-  FILE *fp;
-  fp=fopen(dfsConfigFilename,"r");
-    if (fp == NULL)
-    {
-
-        perror(dfsConfigFilename);
-        exit(1);
-    }
-  fclose(fp);
-  sockfd = socket(AF_INET, SOCK_STREAM, 0);
-  if (sockfd < 0) 
-    perror("ERROR opening socket");
-  bzero((char *) &servAddr, sizeof(servAddr));
-  portno = atoi(argv[1]);
-  servAddr.sin_family = AF_INET;
-  servAddr.sin_addr.s_addr = INADDR_ANY;
-  servAddr.sin_port = htons(portno);
-  if (bind(sockfd, (struct sockaddr *) &servAddr,
-          sizeof(servAddr)) < 0) 
-          perror("ERROR on binding");
-        printf("coming here\n");
-  listen(sockfd,5);
-  clientSize = sizeof(clientAddress);
-  newsockfd = accept(sockfd, 
-             (struct sockaddr *) &clientAddress, 
-             &clientSize);
-  if (newsockfd < 0) 
-      perror("ERROR on accept");
-
-
-  int option;
-  char putFileName[50];
-  char getFileName[50];
-  int stat;
-  int n1;
-  FILE *checkFile;
-  int ack_putfile;
-  int portIndex = portno%5;
-  //printf("%s\n", );
-  printf("portIndex %d\n", portIndex);
-  int iCanStart;
-  int dummy;
-	for (;;) {
-
-      n = recv(newsockfd, (void *)&option, sizeof(int), 0);    // Reading the option from user side
-      if (n < 0)
-      {
+	for(;;){
+		n = recv(acceptSock, (void *)&option, sizeof(int), 0);
+		if (n < 0)
         perror("option receiving failed");
-        //exit(1);
-      }          
 
-    //printf("Option %d received\n", option);
-
-    switch(option)
-    {
-      // This command sends the file to Client 
-      case GET_FILE:
-              n = recv(newsockfd, (void *)&dummy, sizeof(int), 0);    // Reading the option from user side
+    switch(option){
+		//------------------------CHOICE == GET-----------------------------
+		case GET_FILE:
+              n = recv(acceptSock, (void *)&dummy, sizeof(int), 0);
               if (n < 0)
               {
                 perror("option receiving failed");
                 //exit(1);
               }      
               
-              n = recv(newsockfd, (void *)&iCanStart, sizeof(int), 0);    // Reading the option from user side
+              n = recv(acceptSock, (void *)&start, sizeof(int), 0);    // Reading the option from user side
               if (n < 0)
               {
                 perror("option receiving failed");
                 //exit(1);
               } 
-              if (iCanStart)
+              if (start)
               {
                 printf("receiving the file name\n");
-                  if (validateUserDetails(newsockfd))
-                  {
-                    stat = recv(newsockfd, getFileName, 50,0);
-                     if (stat < 0)
+                  if (validateUserDetails(acceptSock)){
+                    recvBytes = recv(acceptSock, filenameGet, 50,0);
+                     if (recvBytes < 0)
                      {
                       perror("Error sending fname");
                       exit(1);
                      }
-                    printf("The file name asked for first time is %s\n", getFileName);
+                    printf("The file name asked for first time is %s\n", filenameGet);
                     // sending the fp
 
-                    send_image(newsockfd, getFileName, clientAddress, portIndex, FIRSTFILE);  
+                    send_image(acceptSock, filenameGet, clientAddress, portIndex, FIRSTFILE);  
                     printf("Exiting the GET_FILE\n");
                     sleep(1);
-                    stat = recv(newsockfd, getFileName, 50,0);
-                     if (stat < 0)
+                    recvBytes = recv(acceptSock, filenameGet, 50,0);
+                     if (recvBytes < 0)
                      {
                       perror("Error sending fname");
                       exit(1);
                      }
-                    printf("The file name asked for second time is %s\n", getFileName);
+                    printf("The file name asked for second time is %s\n", filenameGet);
                     // sending the fp
 
-                    send_image(newsockfd, getFileName, clientAddress, portIndex, SECONDFILE);  
+                    send_image(acceptSock, filenameGet, clientAddress, portIndex, SECONDFILE);  
                     printf("Exiting the GET_FILE\n");
                 }
               }
-
           option = 10;
       break;
 
-      // This command gets file from Client 
-      // USERNAME receive
-      // password receive
-      // ack for validity of user credentials send
-      // size receive
-      // fname receive
-      // fileContent receive
-      case PUT_FILE:
-            // portIndex tells which folder to store in
-            if (validateUserDetails(newsockfd))
-            { 
-              // receiving fst image     
-              receiveFile( newsockfd, clientAddress, clientSize,portIndex); 
-              printf("completed putfile case\n");
+		//------------------------CHOICE == PUT-----------------------------
+		case PUT_FILE:
+            printf("Step: PUT\n");
+            if(validateUserDetails(acceptSock)){ 
+              //receive first chunk of file
+              receiveFile(acceptSock, clientAddress, clientSize, portIndex); 
+              printf("Step: completed put for file chunk 1\n");
 
-              // receiving second image
-              receiveFile( newsockfd, clientAddress, clientSize,portIndex); 
-              printf("completed putfile case\n");
-
+              //receive second chunk of file
+              receiveFile(acceptSock, clientAddress, clientSize, portIndex); 
+              printf("Step: completed put for file chunk 2\n");
             }
             option = 10;
             break;
 
-      // This command send list of files in the current directory to client
-      case LIST_FILES:
-        //bzero(systemListCmd, sizeof(systemListCmd));
-        if (validateUserDetails(newsockfd))
-        {
+		//------------------------CHOICE == LIST-----------------------------
+		case LIST_FILES:
+			//bzero(systemListCmd, sizeof(systemListCmd));
+			if (validateUserDetails(acceptSock))
+			{
 
-          
+			  
 
-          stat = recv(newsockfd, fileNameList, 50,0);
-          if (stat < 0)
-          {
-            perror("Error sending fname");
-            exit(1);
-          }
-          // sprintf(systemListCmd, "ls -a DFS%d/%s > DFS%d/%s/.%s", portIndex, USERDATA.USERNAME, portIndex, USERDATA.USERNAME, fileNameList);
-          // printf("systemListCmd %s\n", systemListCmd);
-          // system(systemListCmd);
-          printf("The file name asked for first time is %s\n", fileNameList);
-          send_image(newsockfd, fileNameList, clientAddress, portIndex, -1); 
-          sleep(1);
-        }
+			  recvBytes = recv(acceptSock, fileNameList, 50,0);
+			  if (recvBytes < 0)
+			  {
+				perror("Error sending fname");
+				exit(1);
+			  }
+			  // sprintf(systemListCmd, "ls -a DFS%d/%s > DFS%d/%s/.%s", portIndex, USERDATA.USERNAME, portIndex, USERDATA.USERNAME, fileNameList);
+			  // printf("systemListCmd %s\n", systemListCmd);
+			  // system(systemListCmd);
+			  printf("The file name asked for first time is %s\n", fileNameList);
+			  send_image(acceptSock, fileNameList, clientAddress, portIndex, -1); 
+			  sleep(1);
+			}
 
            option = 10;
-      break;
+			break;
 
-      // This command closes the server socket and exits the program
-      case CLOSE_SOC:
-        printf("Closing the socket and exiting\n");
-        close(sockfd);   // closing the socket and exiting
-        exit(1);
-        option = 10;
-      break;
+		//------------------------CHOICE == EXIT-----------------------------
+		case CLOSE_SOC:
+			printf("Closing the socket and exiting\n");
+			close(sockfd);   // closing the socket and exiting
+			exit(1);
+			option = 10;
+			break;
 
-      default:
-      break;
-
-    }
-
-	}
-
+		default:
+			break;
+		}
+	}//end of for
 }
