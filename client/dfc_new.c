@@ -55,6 +55,8 @@ void displayMenu(){
 }
 
 
+
+
 //----------------------------GET USER CHOICE--------------------------------
 char getUserChoice(){
 	char command[6];
@@ -67,22 +69,22 @@ char getUserChoice(){
 
 		if(strcmp(command, "get") == 0){
 			choice = GET_FILE;
-			printf("\nCommand entered: %s", command);
+			printf("\nCommand entered: %s\n", command);
 			break;
 		}
 		else if(strcmp(command, "put") == 0){
 			choice = PUT_FILE;
-			printf("\nCommand entered: %s", command);
+			printf("\nCommand entered: %s\n", command);
 			break;
 		}
 		else if(strcmp(command, "ls") == 0){
 			choice = LIST_FILES;
-			printf("\nCommand entered: %s", command);
+			printf("\nCommand entered: %s\n", command);
 			break;
 		}
 		else if(strcmp(command, "exit") == 0){
 			choice = CLOSE_SOC;
-			printf("\nCommand entered: %s", command);
+			printf("\nCommand entered: %s\n", command);
 			break;
 		}
 		else{
@@ -325,7 +327,7 @@ int sendFile(int sockfd, char *fname, struct sockaddr_in serverAddress, char *su
 
 
 
-//--------------------------------RECEIVE FILE FROM SERVER-----------------------
+//------------------------------RECEIVE FILE FROM SERVER-----------------------
 int receiveFile(int sockfd, char *filename, struct sockaddr_in serverAddress, socklen_t clientlen, char *subDirectory){
 	int receivedSize = 0;
 	int recvBytes = 0;
@@ -399,7 +401,7 @@ int receiveFile(int sockfd, char *filename, struct sockaddr_in serverAddress, so
 
 
 
-//------------------------------------------MAIN------------------------------------
+//---------------------------------------MAIN------------------------------------
 //Ref: To split the file into equal parts - http://www.theunixschool.com/2012/10/10-examples-of-split-command-in-unix.html
 //Ref: To do AES encryption - https://askubuntu.com/questions/60712/how-do-i-quickly-encrypt-a-file-with-aes
 int main(int argc, char **argv){
@@ -415,7 +417,7 @@ int main(int argc, char **argv){
 	char filenameGet[20];
 	char filenamePut[20];	
 	char subDirectory[50];
-	char fileNameList[10];
+	char fnameList[10];
 	
 	FILE *fp;
 	FILE *filepointer;
@@ -459,8 +461,7 @@ int main(int argc, char **argv){
 		#endif
 		
 		int dummy = 100;
-		switch(option)
-		{
+		switch(option){
 			//------------------------CHOICE == GET---------------------------------
 			case GET_FILE:
 				for(i=0; i<MAX_CONN; i++){
@@ -703,121 +704,87 @@ int main(int argc, char **argv){
 				printf("DONE WITH PUT\n");
 				break;
 
-			// This command gets the list of files form the server in its current directory
+			//------------------------CHOICE == LIST---------------------------------
 			case LIST_FILES:
 				system("rm .list0_received .list1_received .list2_received .list3_received");
-				printf("Enter the subDirectory\n");
+				printf("Enter the subfolder\n");
 				scanf("%s", subDirectory);
 				
-				int status =0;
-				int checkNoCnnections = 0; 
-				// this part should be uncommented
-				for (i =0; i<MAX_CONN;i++)
-				{
-					sprintf(fileNameList, "list%d", i);
-					//printf("fileNameList %s\n", fileNameList);
-					if (!arrayOfFailedSend[i])
-					{ 
-						if (sendUserCredentials(sockfd[i]))
-			    		{
-						
-							n = send(sockfd[i], fileNameList, 50, 0);
-							if (n < 0)//, (struct sockaddr *)&servAddr, sizeof(servAddr))==-1)
-							{
-								perror("option sending failed");
-							}
-							//exit(1);
-							status = receiveFile(sockfd[i], fileNameList, serverAddress[i], serverLength[i], subDirectory);
+				int status = 0;
+				int numberOfLostConnections = 0; 
+				for(i = 0; i<MAX_CONN; i++){
+					sprintf(fnameList, "list%d", i);
+					if(!arrayOfFailedSend[i]){ 
+						if(sendUserCredentials(sockfd[i])){
+							n = send(sockfd[i], fnameList, 50, 0);
+							if (n < 0)
+								perror("Error\n");
+							
+							status = receiveFile(sockfd[i], fnameList, serverAddress[i], serverLength[i], subDirectory);
 							if (status == 0)
-							{
-								checkNoCnnections++;
-							}
-							//printf("\n\nLOOPPP\n");
+								numberOfLostConnections++;
 						}
-						//	exit(1);
 					}
-					bzero(fileNameList, sizeof(fileNameList));
+					bzero(fnameList, sizeof(fnameList));
 				}
 
-				if (checkNoCnnections == 3)
-				{
-					printf("ALL SERVERS CLOSED\n");
-				}
-		        // creating files if not present
-		        
+				if(numberOfLostConnections == 3)
+					printf("ALL SERVERS ARE DOWN\n");
+				
 		        system("touch .list0_received");
 		        system("touch .list1_received");
 		        system("touch .list2_received");
 		        system("touch .list3_received");
-		        // concat the files present
+		        
+				//concatenate the files present
 		        system("cat .list0_received .list1_received .list2_received .list3_received > temp_list");
 		        system("sort temp_list | uniq > final_list");
-		      
-		        FILE *fp;
-		        char wsBuf[200];
-		        char *val1;
-		        char array[256][256];
-		        char array_withoutIndex[256][256];
-		        char necessary_files[256][256];
 
-		        int p = 0, q = 0;
-
-		        FILE *fr;
-				fr = fopen("final_list","r");
-                if (fr != NULL)
-                {
-                    char line_string[500]; /* Buffer to store the contents of each line */
+		        FILE *fpoint;
+				fpoint = fopen("final_list", "r");
+                if(fpoint != NULL){
+                    char line[500]; /* Buffer to store the contents of each line */
                     int i = 0;
-                    char filename_string[500];
-                    char filename_string1[500];
-                    int subfile_count = 0;
-                    while(fgets(line_string, sizeof(line_string), fr) != NULL)
-                    {
-                        if(strncmp(line_string,".",strlen(".")) == 0)
-                        {
-                            if(strlen(line_string)>3)
-                            {
-                                char *line_ptr; /* Pointer to the start of each line */
-                                line_ptr = strstr((char *)line_string,".");
-                                line_ptr = line_ptr + strlen(".");
-                                if (subfile_count == 0)
-                                {
-                                    bzero(filename_string,sizeof(filename_string));
-                                    memcpy(filename_string,line_ptr,strlen(line_ptr)-2);
+                    char fnameLine[500];
+                    char fnameLine1[500];
+                    int countSubfile = 0;
+                    
+					while(fgets(line, sizeof(line), fpoint) != NULL){
+                        if(strncmp(line, ".", strlen(".")) == 0){
+                            if(strlen(line) > 3){
+                                char *ptr;
+                                ptr = strstr((char *)line, ".");
+                                ptr = ptr + strlen(".");
+                                if(countSubfile == 0){
+                                    bzero(fnameLine, sizeof(fnameLine));
+                                    memcpy(fnameLine, ptr, strlen(ptr)-2);
                                 }
-                                bzero(filename_string1,sizeof(filename_string1));
-                                memcpy(filename_string1,line_ptr,strlen(line_ptr)-2);
-                                if(strcmp(filename_string,filename_string1) == 0)
-                                {
-                                    subfile_count = subfile_count +1;
-                                    if(subfile_count == 4)
-                                        printf("%s [COMPLETE]\n",filename_string);
+                                bzero(fnameLine1, sizeof(fnameLine1));
+                                memcpy(fnameLine1, ptr, strlen(ptr)-2);
+                                if(strcmp(fnameLine,fnameLine1) == 0){
+                                    countSubfile = countSubfile +1;
+                                    if(countSubfile == 4)
+                                        printf("%s [COMPLETE]\n", fnameLine);
                                 }
-                                else
-                                {
-                                    if(subfile_count != 4)
-                                        printf("%s [INCOMPLETE]\n",filename_string);
-                                    subfile_count = 1;
-                                    strcpy(filename_string,filename_string1);
-
+                                else{
+                                    if(countSubfile != 4)
+                                        printf("%s [INCOMPLETE]\n", fnameLine);
+                                    countSubfile = 1;
+                                    strcpy(fnameLine,fnameLine1);
                                 }
                             }
                         }
-                    }
-                    if(subfile_count != 4)
-                        printf("%s [incomplete]\n",filename_string);
+                    }//end of while
+                    if(countSubfile != 4)
+                        printf("%s [incomplete]\n", fnameLine);
                 }
-                fclose(fr);
-
-				
-			break;
+                fclose(fpoint);
+				break;
 
 			default:
-			break;
-
+				break;
 		}
 	}
-
 
 	//close(sockfd);
 	return 0;
