@@ -327,10 +327,55 @@ void calculateMD5(char *filenamePut, char md5sum[100]){
 
 
 
+//-----------------------------SEND FILES TO SERVERS--------------------------------
+int sendFile(int sockfd, char *fname, struct sockaddr_in serverAddress, char *subDirectory){
+	FILE *fp;
+	int fSize;
+	int sendBytes;
+	size_t readSize;
+	char sendBuffer[1024];
+	
+	if(!(fp = fopen(fname, "r")))
+		perror("Error opening the file\n");
+	
+	fSize = getFileSize(fp);
+	printf("Step: sending file size to server\n");
+	if(send(sockfd, &fSize, sizeof(int), 0) < 0){
+		perror("Error in sending the file\n");
+		exit(1);
+	}
+	
+	printf("Step: sending filename\n");
+	if(send(sockfd, fname, 100, 0) < 0){
+		perror("Error in sending the filename\n");
+		exit(1);
+	}
+	
+	printf("Step: sending subDirectory\n");
+	if(send(sockfd, subDirectory, 100, 0) < 0){
+		perror("Error in sending the subDirectory\n");
+		exit(1);
+	}
+	
+	printf("Step: Sending file in progress\n");
+	while(!feof(fp)){
+		readSize = fread(sendBuffer, 1, sizeof(sendBuffer)-1, fp);
+		do{
+			sendBytes = send(sockfd, sendBuffer, readSize, 0);
+			if(sendBytes < 0)
+				perror("Error in sending file chunks\n");
+		} while(sendBytes < 0);
+		bzero(sendBuffer, sizeof(sendBuffer));
+	}
+}
 
+
+
+
+
+//------------------------------------------MAIN-------------------------------------
 //Ref: To split the file into equal parts - http://www.theunixschool.com/2012/10/10-examples-of-split-command-in-unix.html
 //Ref: To do AES encryption - https://askubuntu.com/questions/60712/how-do-i-quickly-encrypt-a-file-with-aes
-//------------------------------------------MAIN-------------------------------------
 int main(int argc, char **argv){
 	int choice = 0;
 	int i;
@@ -581,19 +626,19 @@ int main(int argc, char **argv){
 				if(!arrayOfFailedSend[i]){
 					if(sendUserCredentials(sockfd[i])){
 						//sending first piece of file
-						printf("Step: Calculating index for first piece of file\n")
+						printf("Step: Calculating index for first piece of file\n");
 						finalIndex = (i + md5Index) % 4;
 						strncpy(fnameIndex[finalIndex], filenamePut, sizeof(filenamePut));
 						sprintf(fIndex, "%d", finalIndex);
 						printf("File Index: %s\n", fIndex);
 						strncat(fnameIndex[finalIndex], fIndex, 1);
-						printf("Filename: %s\n", fnameIndex[fIndex]);
+						printf("Filename: %s\n", fnameIndex[finalIndex]);
 						printf("Step: Sending first piece of file\n");
 						sendFile(sockfd[i], fnameIndex[finalIndex], serverAddress[i], subDirectory);
 						sleep(1);
 						
 						//sending second piece of file
-						printf("Step: Calculating index for second piece of file\n")
+						printf("Step: Calculating index for second piece of file\n");
 						strncpy(fnameIndex[(finalIndex+1)%4], filenamePut, sizeof(filenamePut));
 						sprintf(fIndex, "%d", (finalIndex+1)%4);
 						printf("File Index: %s\n", fIndex);
