@@ -62,11 +62,13 @@ int validateUserDetails(int acceptSock){
 	char *unpwd;
 	int valid = FAIL;
 	
+	printf("Step: Receiving Username\n");
 	if(recv(acceptSock,USERDATA.USERNAME,100,0) < 0){
 		perror("Error in receiving username\n");
 		exit(1);
 	}
 	
+	printf("Step: Receiving Password\n");
 	if(recv(acceptSock,USERDATA.PASSWORD,100,0) < 0){
 		perror("Error in receiving password\n");
 		exit(1);
@@ -79,6 +81,7 @@ int validateUserDetails(int acceptSock){
 	}
 	
 	dfsConfigFileSize = getFileSize(fp);
+	printf("Step: Validating Username and Password\n");
 	while(fgets(fileBuffer,dfsConfigFileSize,fp) != NULL){
 		printf("fileBuffer: %s", fileBuffer);
 		unpwd = strtok(fileBuffer, " \t\n");
@@ -90,6 +93,7 @@ int validateUserDetails(int acceptSock){
 	}
 	fclose(fp);
 	
+	printf("Step: Sending ACK for receipt of Username and Password\n");
 	if(send(acceptSock, &valid, sizeof(int), 0) < 0)
 		perror("Error in sending ack for username and password\n");
 	
@@ -296,8 +300,127 @@ void sendFile(int acceptSock, char *filenameGet, struct sockaddr_in clientAddres
 
 
 
-//----------------------------------MAIN------------------------------------
 
+//------------------------------RECEIVE FILE FROM CLIENT----------------------------
+int receiveFile(int sockfd, struct sockaddr_in clientAddress, socklen_t clientSize, int portIndex){
+	int fSize;
+	int recvSize;
+	int recvBytes;
+	int writtenBytes;
+	char fname[100];
+	char subDirectory[100];
+	char fnameReceived[100];
+	char dfsMainFolder[100];
+	char dfsUserFolder[150];
+	char dfsUsernameAndSubFolder[200];
+	char fndot[100];
+	char *receiveBuffer;
+	FILE *fp;
+	
+	receiveBuffer = malloc(300000);
+	
+	printf("Step: Receiving file size\n");
+	if(recv(sockfd, &fSize, sizeof(int), 0) < 0)
+		perror("Error in receiving the file size\n");
+	printf("file size: %d\n", fSize);
+	
+	printf("Step: Receiving file name\n");
+	if(recv(sockfd, &fname, 100, 0) < 0)
+		perror("Error in receiving the file name\n");
+	printf("file name: %s\n", fname);
+	
+	printf("Step: Receiving subDirectory\n");
+	if(recv(sockfd, &fname, 100, 0) < 0)
+		perror("Error in receiving the subDirectory\n");
+	printf("subDirectory: %s\n", subDirectory);
+	
+	bzero(fnameReceived, sizeof(fnameReceived));
+	strncat(fnameReceived, fname, 100);
+	strncat(fnameReceived, "_recv",100);
+	bzero(dfsMainFolder, sizeof(dfsMainFolder));
+	
+	printf("Step: Creating DFS MAIN directories\n");
+	if(portIndex == 1){
+		strncpy(dfsMainFolder, "DFS1", sizeof("DFS1"));
+		system("mkdir -p DFS1");
+		strncpy(dfsUserFolder, "mkdir -p DFS1/", strlen("mkdir -p DFS1/"));
+	}
+	else if(portIndex == 2){
+		strncpy(dfsMainFolder, "DFS2", sizeof("DFS2"));
+		system("mkdir -p DFS2");
+		strncpy(dfsUserFolder, "mkdir -p DFS2/", strlen("mkdir -p DFS2/"));
+	}
+	else if(portIndex == 3){
+		strncpy(dfsMainFolder, "DFS3", sizeof("DFS3"));
+		system("mkdir -p DFS3");
+		strncpy(dfsUserFolder, "mkdir -p DFS3/", strlen("mkdir -p DFS3/"));
+	}
+	else if(portIndex == 4){
+		strncpy(dfsMainFolder, "DFS4", sizeof("DFS4"));
+		system("mkdir -p DFS4");
+		strncpy(dfsUserFolder, "mkdir -p DFS4/", strlen("mkdir -p DFS4/"));
+	}
+	
+	printf("Step: Creating USERNAME directory\n");
+	strncat(dfsUserFolder, USERDATA.USERNAME, strlen(USERDATA.USERNAME));
+	system(dfsUserFolder);
+	
+	printf("Step: Creating USERNAME/subdirectory\n");
+	if(strcmp(subDirectory, "/") == 0)
+		printf("subDirectory is empty\n");
+	else{
+		sprintf(dfsUsernameAndSubFolder, "mkdir -p %s/%s", dfsUserFolder, subDirectory);
+		system(dfsUsernameAndSubFolder);
+	}
+	
+	strncat(dfsMainFolder, "/", sizeof("/"));
+	strncat(dfsMainFolder, USERDATA.USERNAME, strlen(USERDATA.USERNAME));
+	bzero(fndot, sizeof(fndot));
+	
+	#if 0
+		strcpy(fndot, fname);
+	#else
+		strncpy(fndot, ".", sizeof("."));
+		strcat(fndot, fname);
+	#endif
+	
+	if(strcmp(subDirectory, "/") == 0)
+		printf("subDirectory is empty\n");
+	else
+		sprintf(dfsMainFolder, "%s/%s", dfsMainFolder, subDirectory);
+	
+	strncat(dfsMainFolder, "/", sizeof("/"));
+	strncat(dfsMainFolder, fndot, sizeof(fndot));
+	printf("DFS Main Folder: %s", dfsMainFolder);
+	
+	fp = fopen(dfsMainFolder, "w");
+	if(fp == NULL){
+		perror("Error in opening the file\n");
+		return -1;
+	}
+	
+	printf("Step: Receiving file chunks\n");
+	while(recvSize < fSize){
+		recvBytes = recv(sockfd, receiveBuffer, 300000, 0);
+		writtenBytes = fwrite(receiveBuffer, 1, recvBytes, fp);
+		recvSize = recvSize + recvBytes;
+		printf("Total filesize received so far: %d", recvSize);
+	}
+	
+	bzero(dfsUserFolder, sizeof(dfsUserFolder));
+	fclose(fp);
+	return 1;
+}
+
+
+
+
+
+
+
+
+
+//----------------------------------MAIN------------------------------------
 //Ref: https://stackoverflow.com/questions/30356043/finding-ip-address-of-client-and-server-in-socket-programming
 int main(int argc, char **argv){
 	int sockfd;
@@ -334,9 +457,8 @@ int main(int argc, char **argv){
 	
 	if(bind(sockfd, (struct sockaddr*)&serverAddress, sizeof(serverAddress)) < 0)
 		perror("Error in bind()\n");
-	
-	int clientSize = sizeof(clientAddress);
 	listen(sockfd,5);
+	socklen_t clientSize = sizeof(clientAddress);
 	acceptSock = accept(sockfd, (struct sockaddr*)&clientAddress, &clientSize);
 	if(acceptSock < 0)
 		perror("Error in accept()");
@@ -373,7 +495,16 @@ int main(int argc, char **argv){
 			}
 		}//end of GET
 		
-		else
+		else if(choice == PUT){
+			printf("Step: PUT\n");
+			if(validateUserDetails(acceptSock)){
+				printf("Step: Receive first piece of file\n");
+				receiveFile(acceptSock, clientAddress, clientSize, portIndex);
+				
+				printf("Step: Receive second piece of file\n");
+				receiveFile(acceptSock, clientAddress, clientSize, portIndex);
+			}
+		}
 		
 		
 	}//end of while
