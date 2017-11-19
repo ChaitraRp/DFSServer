@@ -26,19 +26,18 @@
 #define TRUE 1
 #define FALSE 0
 
-#define SUCCESS 1
+#define PASS 1
 #define FAIL 0
 
+#define MAX_CONN 4
 #define TIMEOUT 1
 
+int PORT;
 char SERVERS[4][100];
 char USERNAME[100];
 char PASSWORD[100];
 char dfcConfigFile[100];
 
-int PORT;
-
-#define MAX_CONN 4
 struct sockaddr_in  serverAddress[MAX_CONN];
 socklen_t serverLength[MAX_CONN];
 int sockfd[MAX_CONN];
@@ -81,13 +80,11 @@ char getUserChoice(){
 			printf("\nCommand entered: %s", command);
 			break;
 		}
-
 		else if(strcmp(command, "exit") == 0){
 			choice = CLOSE_SOC;
 			printf("\nCommand entered: %s", command);
 			break;
 		}
-
 		else{
 			printf("\nInvalid command!\n");
 			displayMenu();
@@ -95,6 +92,8 @@ char getUserChoice(){
 	}
 	return choice;
 }
+
+
 
 
 //----------------------------GET FILE SIZE----------------------------------
@@ -151,7 +150,7 @@ void readConfFile(int lineLimit){
 	                }
 	                printf("SERVERS[%d]: %s\n", i, SERVERS[i]);
 	                bzero(readBuffer, sizeof(readBuffer));
-	                i = i%4;
+	                i = i % 4;
 	            }
         	}
         	else
@@ -207,7 +206,7 @@ int sendUserDetails(int sockfd1){
     	printf("INVALID USERNAME OR PASSWORD\n");
     	return FAIL;
     }
-    return SUCCESS;
+    return PASS;
 }
 
 
@@ -271,8 +270,6 @@ void calculateMd5Sum(char *filenamePut, char md5sum[100]){
 
 
 
-
-
 //--------------------------SEND FILES TO SERVERS----------------------------
 int sendFile(int sockfd, char *fname, struct sockaddr_in serverAddress, char *subDirectory){
 	FILE *fp;
@@ -328,7 +325,7 @@ int sendFile(int sockfd, char *fname, struct sockaddr_in serverAddress, char *su
 
 
 
-
+//--------------------------------RECEIVE FILE FROM SERVER-----------------------
 int receive_image(int sockfd, char *filename, struct sockaddr_in serverAddress, socklen_t clientlen, char *subDirectory)
 {
 	
@@ -336,14 +333,19 @@ int receive_image(int sockfd, char *filename, struct sockaddr_in serverAddress, 
 
 
 
+
+
+//------------------------------------------MAIN------------------------------------
+//Ref: To split the file into equal parts - http://www.theunixschool.com/2012/10/10-examples-of-split-command-in-unix.html
+//Ref: To do AES encryption - https://askubuntu.com/questions/60712/how-do-i-quickly-encrypt-a-file-with-aes
 int main(int argc, char **argv){
-	int arrayOfFailedSend[MAX_CONN];
 	int md5Int;
 	int md5Index;
 	int finalIndex;
 	int option = 0;
 	int dummy = 0;
 	int i, n;
+	int arrayOfFailedSend[MAX_CONN];
 	
 	char md5sum[100];
 	char filenameGet[20];
@@ -375,7 +377,7 @@ int main(int argc, char **argv){
 	
 	while(1){
 		option = getUserChoice();
-#if 1
+		#if 1
 		for (i=0;i<MAX_CONN;i++){
 			int n = send(sockfd[i], (void *)&option, sizeof(int), 0);	
 			if (n < 0){
@@ -386,11 +388,12 @@ int main(int argc, char **argv){
 				arrayOfFailedSend[i] = FALSE;
 			}
 		}
-#else
+		#else
 			int n = send(sockfd[0], (void *)&option, sizeof(int), 0);	
 			if (n < 0)
 				perror("Writing to socket: option sending failed");
-#endif
+		#endif
+		
 		int dummy = 100;
 		switch(option)
 		{
@@ -398,10 +401,8 @@ int main(int argc, char **argv){
 
 					for (i=0;i<MAX_CONN;i++)
 					{
-						printf("**Option Sent !!\n");
 						int n = send(sockfd[i], (void *)&dummy, sizeof(int), 0);	
-						printf(" ....%d\n", n);
-						if (n < 0)//, 0, (struct sockaddr *)&servAddr, sizeof(servAddr))==-1)
+						if (n < 0)
 						{
 							arrayOfFailedSend[i] = TRUE;
 							perror("Writing to socket: option sending failed");
@@ -600,6 +601,7 @@ int main(int argc, char **argv){
 				break;
 
 
+				
 			//------------------------CHOICE == PUT----------------------------------
 			case PUT_FILE:
 				printf("Step: PUT\n");
@@ -633,25 +635,25 @@ int main(int argc, char **argv){
 			    bzero(filename, sizeof(filename));
 			    strncpy(filename,filenamePut,sizeof(filenamePut));
 			    strncpy(filename, filenamePut,strlen(filenamePut));
-			    sprintf(systemCommand,"split -n 4 -a 1 -d %s en%s",filenamePut, filenamePut);
+			    sprintf(systemCommand,"split -n 4 -a 1 -d %s fragment_%s",filenamePut, filenamePut);
 			    system(systemCommand);
 
 			    //Encryption using AES
 				printf("Step: Encrypting file using AES\n");
-			    char encryptSystemCmd[200];
-			    bzero(encryptSystemCmd,sizeof(encryptSystemCmd));
+			    char encryptyCommand[200];
+			    bzero(encryptyCommand,sizeof(encryptyCommand));
 			    readConfFile(0);
 			    for (i=0; i<MAX_CONN; i++){
-			    	sprintf(encryptSystemCmd,"openssl enc -aes-256-cbc -in en%s%d -out %s%d -k %s", filenamePut, i, filenamePut, i, PASSWORD);
-			    	system(encryptSystemCmd);
+			    	sprintf(encryptyCommand,"openssl enc -aes-256-cbc -in fragment_%s%d -out %s%d -k %s", filenamePut, i, filenamePut, i, PASSWORD);
+			    	system(encryptyCommand);
 			  	}
 
-			    char filenameWithIndex[4][100];
-			    char fileIndex[1];
+			    char fnameWithIndex[4][100];
+			    char fnIndex[1];
 			    #if 1
-			    	for (i = 0; i< MAX_CONN; i++)
+			    	for (i=0; i<MAX_CONN; i++)
 			    #else
-			    	for (i = 0; i< 1; i++)
+			    	for (i=0; i<1; i++)
 			    #endif
 			    {
 			    	if (!arrayOfFailedSend[i])
@@ -661,28 +663,28 @@ int main(int argc, char **argv){
 					    	//first piece of file
 							printf("Step: Calculating index for first piece of file\n");
 					    	finalIndex = (i+md5Index)%4;
-					    	strncpy(filenameWithIndex[finalIndex], filenamePut, sizeof(filenamePut));
-					    	sprintf(fileIndex,"%d",finalIndex);
-					    	printf("fileIndex  :   %s\n", fileIndex);
-					    	strncat(filenameWithIndex[finalIndex], fileIndex, 1);
-					    	printf("filename %s\n", filenameWithIndex[finalIndex]);
-							sendFile(sockfd[i], filenameWithIndex[finalIndex], serverAddress[i], subDirectory);
+					    	strncpy(fnameWithIndex[finalIndex], filenamePut, sizeof(filenamePut));
+					    	sprintf(fnIndex,"%d",finalIndex);
+					    	printf("fnIndex  :   %s\n", fnIndex);
+					    	strncat(fnameWithIndex[finalIndex], fnIndex, 1);
+					    	printf("filename %s\n", fnameWithIndex[finalIndex]);
+							sendFile(sockfd[i], fnameWithIndex[finalIndex], serverAddress[i], subDirectory);
 							
 							sleep(1);
 							
 							//second piece of file
 							printf("Step: Calculating index for second piece of file\n");
-							strncpy(filenameWithIndex[(finalIndex+1)%4], filenamePut, sizeof(filenamePut));
-					    	sprintf(fileIndex,"%d",(finalIndex+1)%4);
-					    	printf("fileIndex  :   %s\n", fileIndex);
-					    	strncat(filenameWithIndex[(finalIndex+1)%4], fileIndex, 1);
-					    	printf("filename %s\n", filenameWithIndex[(finalIndex+1)%4]);
-							sendFile(sockfd[i], filenameWithIndex[(finalIndex+1)%4], serverAddress[i], subDirectory);
+							strncpy(fnameWithIndex[(finalIndex+1)%4], filenamePut, sizeof(filenamePut));
+					    	sprintf(fnIndex,"%d",(finalIndex+1)%4);
+					    	printf("fnIndex  :   %s\n", fnIndex);
+					    	strncat(fnameWithIndex[(finalIndex+1)%4], fnIndex, 1);
+					    	printf("filename %s\n", fnameWithIndex[(finalIndex+1)%4]);
+							sendFile(sockfd[i], fnameWithIndex[(finalIndex+1)%4], serverAddress[i], subDirectory);
 							
 							//bzero everything
-							bzero(filenameWithIndex[finalIndex], sizeof(filenameWithIndex[finalIndex]));
-							bzero(filenameWithIndex[(finalIndex+1)%4], sizeof(filenameWithIndex[(finalIndex+1)%4]));
-							bzero(fileIndex, sizeof(fileIndex));
+							bzero(fnameWithIndex[finalIndex], sizeof(fnameWithIndex[finalIndex]));
+							bzero(fnameWithIndex[(finalIndex+1)%4], sizeof(fnameWithIndex[(finalIndex+1)%4]));
+							bzero(fnIndex, sizeof(fnIndex));
 						}
 					}
 				}
