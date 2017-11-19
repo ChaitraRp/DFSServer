@@ -337,47 +337,40 @@ int receive_image(int sockfd, char *filename, struct sockaddr_in serverAddress, 
 
 
 int main(int argc, char **argv){
-	if (argc < 2) {
-     	fprintf(stderr,"configuration file absent\n");
+	if(argc < 2){
+     	fprintf(stderr, "dfc.conf file is missing from the arguments\n");
      	exit(1);
   	}
-  	sprintf(dfcConfigFile,"%s",argv[1]);
+  	
+	sprintf(dfcConfigFile, "%s", argv[1]);
   	FILE *fp;
-  	fp=fopen(dfcConfigFile,"r");
-    if (fp == NULL)
-    {
-
-        perror(dfcConfigFile);
+  	fp = fopen(dfcConfigFile,"r");
+    if(fp == NULL){
+        perror("Error in opening config file\n");
         exit(1);
     }
   	fclose(fp);
-  	printf("%s\n", dfcConfigFile);
 
 	signal(SIGPIPE, SIG_IGN);
-	char md5sum[100];
-	int md5sumInt;
-	int sendFailedArray[MAX_CONN];
-	int listCheck[MAX_CONN] = {0, 0, 0, 0};
-	int dummy = 0;
-	
 	readConfFile(1);
-	
 	createSockets();
 	
-	char *subFolder;
-	int i;
-	int option = 0;      
-	char getFileName[20];
-	char putFileName[20];
-	int n;
-	FILE *picture;
-	int j;
+	int arrayOfFailedSend[MAX_CONN];
+	int md5sumInt;
 	int ack_putfile;
 	int md5sumIndex;
 	int finalIndex;
-	char *val1;
+	int option = 0;
+	int dummy = 0;
+	int i, n;
+	
+	char md5sum[100];
+	char getFileName[20];
+	char putFileName[20];	
 	char subfolder[50];
 	char fileNameList[10];
+	
+	FILE *picture;
 	
 	while(1){
 		option = getUserChoice();
@@ -385,11 +378,11 @@ int main(int argc, char **argv){
 		for (i=0;i<MAX_CONN;i++){
 			int n = send(sockfd[i], (void *)&option, sizeof(int), 0);	
 			if (n < 0){
-				sendFailedArray[i] = TRUE;
+				arrayOfFailedSend[i] = TRUE;
 				perror("Writing to socket: option sending failed");
 			}
 			else{
-				sendFailedArray[i] = FALSE;
+				arrayOfFailedSend[i] = FALSE;
 			}
 		}
 #else
@@ -409,12 +402,12 @@ int main(int argc, char **argv){
 						printf(" ....%d\n", n);
 						if (n < 0)//, 0, (struct sockaddr *)&servAddr, sizeof(servAddr))==-1)
 						{
-							sendFailedArray[i] = TRUE;
+							arrayOfFailedSend[i] = TRUE;
 							perror("Writing to socket: option sending failed");
 						}
 						else
 						{
-							sendFailedArray[i] = FALSE;
+							arrayOfFailedSend[i] = FALSE;
 						}
 					}
 				// choosing the filename
@@ -443,13 +436,13 @@ int main(int argc, char **argv){
 			    // coptimizing get
 			    // for (i<0;i<MAX_CONN;i++)
 			    // {
-			    // 	if (!sendFailedArray[i]) 
+			    // 	if (!arrayOfFailedSend[i]) 
 			    // }
 			    int serverToUse[MAX_CONN ] = {-1,-1,-1,-1};
-			    if (!sendFailedArray[0])
+			    if (!arrayOfFailedSend[0])
 			    {
 			    	serverToUse[0] = 1;
-			    	if (!sendFailedArray[2])
+			    	if (!arrayOfFailedSend[2])
 			    	//get from 0 and 2 
 			    	{
 			    		serverToUse[2] = 1;
@@ -457,7 +450,7 @@ int main(int argc, char **argv){
 			    	}
 			    	else
 			    	{
-			    		if (!sendFailedArray[1] && !sendFailedArray[3])
+			    		if (!arrayOfFailedSend[1] && !arrayOfFailedSend[3])
 			    		{
 			    			serverToUse[1] = 1;	
 			    			serverToUse[3] = 1;	
@@ -469,10 +462,10 @@ int main(int argc, char **argv){
 			    		}
 			    	}
 			    }
-			    else if (!sendFailedArray[1])
+			    else if (!arrayOfFailedSend[1])
 			    {
 			    	serverToUse[1] = 1;
-			    	if (!sendFailedArray[3])
+			    	if (!arrayOfFailedSend[3])
 			    	//get from 1 and 3  
 			    	{
 			    		printf("COMPLETE 2\n");
@@ -527,7 +520,7 @@ int main(int argc, char **argv){
 			    //tempVali = i;
 
 			    {
-			    	//if (!sendFailedArray[i])
+			    	//if (!arrayOfFailedSend[i])
 			    	if (serverToUse[i] == 1)
 			    	{
 			    		printf("**************************************************************************************\n");
@@ -680,7 +673,7 @@ int main(int argc, char **argv){
 			    	for (i = 0; i< 1; i++)
 			    #endif
 			    {
-			    	if (!sendFailedArray[i])
+			    	if (!arrayOfFailedSend[i])
 			    	{
 				    	if (sendUserDetails(sockfd[i]))
 				    	{
@@ -728,7 +721,7 @@ int main(int argc, char **argv){
 				{
 					sprintf(fileNameList, "list%d", i);
 					//printf("fileNameList %s\n", fileNameList);
-					if (!sendFailedArray[i])
+					if (!arrayOfFailedSend[i])
 					{ 
 						if (sendUserDetails(sockfd[i]))
 			    		{
