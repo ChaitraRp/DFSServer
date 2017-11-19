@@ -337,14 +337,30 @@ int receive_image(int sockfd, char *filename, struct sockaddr_in serverAddress, 
 
 
 int main(int argc, char **argv){
+	int arrayOfFailedSend[MAX_CONN];
+	int md5Int;
+	int md5Index;
+	int finalIndex;
+	int option = 0;
+	int dummy = 0;
+	int i, n;
+	
+	char md5sum[100];
+	char filenameGet[20];
+	char filenamePut[20];	
+	char subDirectory[50];
+	char fileNameList[10];
+	
+	FILE *fp;
+	FILE *filepointer;
+	
 	if(argc < 2){
      	fprintf(stderr, "dfc.conf file is missing from the arguments\n");
      	exit(1);
   	}
   	
 	sprintf(dfcConfigFile, "%s", argv[1]);
-  	FILE *fp;
-  	fp = fopen(dfcConfigFile,"r");
+  	fp = fopen(dfcConfigFile, "r");
     if(fp == NULL){
         perror("Error in opening config file\n");
         exit(1);
@@ -352,25 +368,10 @@ int main(int argc, char **argv){
   	fclose(fp);
 
 	signal(SIGPIPE, SIG_IGN);
+	printf("Step: Reading Config file for Server details\n");
 	readConfFile(1);
+	printf("Step: Creating sockets\n");
 	createSockets();
-	
-	int arrayOfFailedSend[MAX_CONN];
-	int md5sumInt;
-	int ack_putfile;
-	int md5sumIndex;
-	int finalIndex;
-	int option = 0;
-	int dummy = 0;
-	int i, n;
-	
-	char md5sum[100];
-	char getFileName[20];
-	char putFileName[20];	
-	char subfolder[50];
-	char fileNameList[10];
-	
-	FILE *picture;
 	
 	while(1){
 		option = getUserChoice();
@@ -412,32 +413,12 @@ int main(int argc, char **argv){
 					}
 				// choosing the filename
 				printf("Enter the file name and subfoolder you wish to receive from\n");
-				scanf("%s", getFileName);
-				scanf("%s", subfolder);
-				printf("The file name entered is %s\n", getFileName);
-				printf("subfolder %s\n", subfolder);
+				scanf("%s", filenameGet);
+				scanf("%s", subDirectory);
+				printf("The file name entered is %s\n", filenameGet);
+				printf("subDirectory %s\n", subDirectory);
 
-				// while(1)
-			 //    {
-			 //    	if (!(picture = fopen(getFileName, "r"))) 
-			 //    	{
-			 //   			perror("fopen");
-				// 		printf("These are the list of files in your folder\n");
-			 //    		system("ls");	    	
-			 //    		printf("Re enter the file name\n");
-			 //    		scanf("%s", getFileName);
-			 //    	}
-
-			 //    	else{
-			 //    		break;
-			 //    	}
-			 //    }
-
-			    // coptimizing get
-			    // for (i<0;i<MAX_CONN;i++)
-			    // {
-			    // 	if (!arrayOfFailedSend[i]) 
-			    // }
+			
 			    int serverToUse[MAX_CONN ] = {-1,-1,-1,-1};
 			    if (!arrayOfFailedSend[0])
 			    {
@@ -527,21 +508,21 @@ int main(int argc, char **argv){
 
 			    		if (sendUserDetails(sockfd[i])){
 			    			// receivinf image 1
-					    	n = send(sockfd[i], getFileName, 50, 0);
+					    	n = send(sockfd[i], filenameGet, 50, 0);
 							if (n < 0)//, (struct sockaddr *)&servAddr, sizeof(servAddr))==-1)
 							{
 								perror("option sending failed");
 							}
-							receive_image(sockfd[i], getFileName, serverAddress[i], serverLength[i], subfolder);
+							receive_image(sockfd[i], filenameGet, serverAddress[i], serverLength[i], subDirectory);
 							printf("**********************\n");
 							//sleep(1);
 							// receiving image 2
-							n = send(sockfd[i], getFileName, 50, 0);
+							n = send(sockfd[i], filenameGet, 50, 0);
 							if (n < 0)//, (struct sockaddr *)&servAddr, sizeof(servAddr))==-1)
 							{
 								perror("option sending failed");
 							}
-							receive_image(sockfd[i], getFileName, serverAddress[i], serverLength[i], subfolder);
+							receive_image(sockfd[i], filenameGet, serverAddress[i], serverLength[i], subDirectory);
 							printf("**********************\n");
 						}
 
@@ -563,7 +544,7 @@ int main(int argc, char **argv){
     			char decryptSystemCmd[300];
     			bzero(systemLSgetFiles, sizeof(systemLSgetFiles));
 			    strncpy(systemLSgetFiles, "ls -a .", strlen("ls -a .")); // ls 
-			    strncat(systemLSgetFiles, getFileName, strlen(getFileName)); // ls [filename]
+			    strncat(systemLSgetFiles, filenameGet, strlen(filenameGet)); // ls [filename]
 			    strncat(systemLSgetFiles, "*_rec*", strlen("*_rec*"));
 			    char fileList[4][100];
 			    printf("systemLSgetFiles %s\n", systemLSgetFiles);
@@ -598,7 +579,7 @@ int main(int argc, char **argv){
 
 			    	}
 			    		
-			    	sprintf(catCommand,"cat de%s de%s de%s de%s > %s_received", fileList[0],fileList[1],fileList[2],fileList[3], getFileName);
+			    	sprintf(catCommand,"cat de%s de%s de%s de%s > %s_received", fileList[0],fileList[1],fileList[2],fileList[3], filenameGet);
 			    	//printf("wow %s\n", catCommand);
 			    	system(catCommand);
 			    	printf("FILE CONCAT SUCCESSFUL\n");
@@ -623,16 +604,16 @@ int main(int argc, char **argv){
 			case PUT_FILE:
 				printf("Step: PUT\n");
 				printf("Enter the name of the file and subDirectory: ");
-				scanf("%s", putFileName);
-				scanf("%s", subfolder);
+				scanf("%s", filenamePut);
+				scanf("%s", subDirectory);
 				
 				while(1){
-			    	if(!(picture = fopen(putFileName, "r"))){
+			    	if(!(filepointer = fopen(filenamePut, "r"))){
 			   			perror("Error in opening the file");
 						printf("List of files:\n");
 			    		system("ls");
 			    		printf("Enter the file name again\n");
-			    		scanf("%s", putFileName);
+			    		scanf("%s", filenamePut);
 			    	}
 			    	else
 			    		break;
@@ -640,19 +621,19 @@ int main(int argc, char **argv){
 			   	
 			    //Calculate MD5 sum
 				printf("Step: Calculating MD5sum\n");
-			    calculateMd5Sum(putFileName, md5sum);
-				md5sumInt = md5sum[strlen(md5sum)-1] % 4;
-				md5sumIndex = (4-md5sumInt)%4;
-				printf("md5sumIndex %d\n", md5sumIndex);
+			    calculateMd5Sum(filenamePut, md5sum);
+				md5Int = md5sum[strlen(md5sum)-1] % 4;
+				md5Index = (4-md5Int)%4;
+				printf("md5Index %d\n", md5Index);
 				
 			    //Divide the file using split command
 				printf("Step: Divide the file into four parts\n");
 			    char systemCommand[150];
 			    char filename[100];
 			    bzero(filename, sizeof(filename));
-			    strncpy(filename,putFileName,sizeof(putFileName));
-			    strncpy(filename, putFileName,strlen(putFileName));
-			    sprintf(systemCommand,"split -n 4 -a 1 -d %s en%s",putFileName, putFileName);
+			    strncpy(filename,filenamePut,sizeof(filenamePut));
+			    strncpy(filename, filenamePut,strlen(filenamePut));
+			    sprintf(systemCommand,"split -n 4 -a 1 -d %s en%s",filenamePut, filenamePut);
 			    system(systemCommand);
 
 			    //Encryption using AES
@@ -661,7 +642,7 @@ int main(int argc, char **argv){
 			    bzero(encryptSystemCmd,sizeof(encryptSystemCmd));
 			    readConfFile(0);
 			    for (i=0; i<MAX_CONN; i++){
-			    	sprintf(encryptSystemCmd,"openssl enc -aes-256-cbc -in en%s%d -out %s%d -k %s", putFileName, i, putFileName, i, PASSWORD);
+			    	sprintf(encryptSystemCmd,"openssl enc -aes-256-cbc -in en%s%d -out %s%d -k %s", filenamePut, i, filenamePut, i, PASSWORD);
 			    	system(encryptSystemCmd);
 			  	}
 
@@ -679,24 +660,24 @@ int main(int argc, char **argv){
 				    	{
 					    	//first piece of file
 							printf("Step: Calculating index for first piece of file\n");
-					    	finalIndex = (i+md5sumIndex)%4;
-					    	strncpy(filenameWithIndex[finalIndex], putFileName, sizeof(putFileName));
+					    	finalIndex = (i+md5Index)%4;
+					    	strncpy(filenameWithIndex[finalIndex], filenamePut, sizeof(filenamePut));
 					    	sprintf(fileIndex,"%d",finalIndex);
 					    	printf("fileIndex  :   %s\n", fileIndex);
 					    	strncat(filenameWithIndex[finalIndex], fileIndex, 1);
 					    	printf("filename %s\n", filenameWithIndex[finalIndex]);
-							sendFile(sockfd[i], filenameWithIndex[finalIndex], serverAddress[i], subfolder);
+							sendFile(sockfd[i], filenameWithIndex[finalIndex], serverAddress[i], subDirectory);
 							
 							sleep(1);
 							
 							//second piece of file
 							printf("Step: Calculating index for second piece of file\n");
-							strncpy(filenameWithIndex[(finalIndex+1)%4], putFileName, sizeof(putFileName));
+							strncpy(filenameWithIndex[(finalIndex+1)%4], filenamePut, sizeof(filenamePut));
 					    	sprintf(fileIndex,"%d",(finalIndex+1)%4);
 					    	printf("fileIndex  :   %s\n", fileIndex);
 					    	strncat(filenameWithIndex[(finalIndex+1)%4], fileIndex, 1);
 					    	printf("filename %s\n", filenameWithIndex[(finalIndex+1)%4]);
-							sendFile(sockfd[i], filenameWithIndex[(finalIndex+1)%4], serverAddress[i], subfolder);
+							sendFile(sockfd[i], filenameWithIndex[(finalIndex+1)%4], serverAddress[i], subDirectory);
 							
 							//bzero everything
 							bzero(filenameWithIndex[finalIndex], sizeof(filenameWithIndex[finalIndex]));
@@ -711,8 +692,8 @@ int main(int argc, char **argv){
 			// This command gets the list of files form the server in its current directory
 			case LIST_FILES:
 				system("rm .list0_received .list1_received .list2_received .list3_received");
-				printf("Enter the subfolder\n");
-				scanf("%s", subfolder);
+				printf("Enter the subDirectory\n");
+				scanf("%s", subDirectory);
 				
 				int status =0;
 				int checkNoCnnections = 0; 
@@ -732,7 +713,7 @@ int main(int argc, char **argv){
 								perror("option sending failed");
 							}
 							//exit(1);
-							status = receive_image(sockfd[i], fileNameList, serverAddress[i], serverLength[i], subfolder);
+							status = receive_image(sockfd[i], fileNameList, serverAddress[i], serverLength[i], subDirectory);
 							if (status == 0)
 							{
 								checkNoCnnections++;
