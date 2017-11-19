@@ -113,324 +113,200 @@ int validateUserDetails(int acceptSock){
 
 
 
- 
-  /*****************************************************
- * send_image: Transfers the file from Server to Client
- 
- ARGUMENTS
- int sockfd - descriptor for socket created  
- char *filename - filename to send from Server to Client
- struct sockaddr_in servAddr  - contains the client informatiom
- *****************************************************/
-
-int send_image(int sockfd, char *filename, struct sockaddr_in clientAddress, int portIndex, int fileNumber){
-
-   FILE *picture;                   // Reads the picture
-   char subDirectory[100];
-   // size: stores the total size of the image, read_size: stores the return value of func recvfrm() 
-   // Sequence number of the packer being sent
-   // send_buffer: buffer to send the packet read_buffer: reads the message server
-
-
-   size_t  read_size, recvBytes; 
-   int packet_index, size;
-   struct timeval timeout = {2,0}; // determines the timeout
-   char send_buffer[1024], read_buffer[256];
-   char systemListCmd[200];
-   bzero(systemListCmd, sizeof(systemListCmd));
-   packet_index = 1;
-
-  fd_set fds;
-  int buffer_fd, buffer_out, flags;
-  socklen_t servlen = sizeof(clientAddress);  // new
-
-  char dfsMainFolder[100];
-  bzero(dfsMainFolder, sizeof(dfsMainFolder));
-
-  // variables for opeing a directory
-  DIR           *d;
-  struct dirent *dir;
-  int count = 0;
-  int index = 0;
-  char name[256][256];
-
-  // receive the subDirectory name
-  recvBytes = recv(sockfd, subDirectory, 100, 0);  // reading the filename 
-  if (recvBytes < 0)
-  {
-    perror("Error receiving subDirectory");
-  }
-  printf("subDirectory%s\n", subDirectory);
+//-------------------------SEND FILE TO CLIENT-------------------------------------
+int sendFile(int acceptSock, char *filename, struct sockaddr_in clientAddress, int portIndex, int fileNumber){
+	FILE *fp;
+	struct timeval timeout = {2,0};
+	
+	int fSize;
+	int count = 0;
+	int status = -5;
+	int n;
+	char subDirectory[100];
+	char name[256][256];
+	char sendBuffer[1024];
+	char recvBuffer[256];
+	char listCommand[200];
+	char dfsMainFolder[100];
+	char dfsUserFolder[100];
+	char fn[100];
+	char fndot[100];
+	char fileExistsCheck[200];
+	
+	DIR *directory;
+	struct dirent *dir;
+	size_t  readSize, recvBytes;
+	
+	bzero(listCommand, sizeof(listCommand));
+	bzero(dfsMainFolder, sizeof(dfsMainFolder));
+	
+	recvBytes = recv(acceptSock, subDirectory, 100, 0);
+	if(recvBytes < 0)
+		perror("Error in receiving subDirectory name");
 
 
-  // USED for list dude
-  if (fileNumber == -1)
-  {
-    if (strcmp(subDirectory,"/") == 0)
-    {
-      sprintf(systemListCmd, "ls -a DFS%d/%s > DFS%d/%s/.%s", portIndex, USERDATA.USERNAME, portIndex, USERDATA.USERNAME, filename);
-      printf("systemListCmd %s\n", systemListCmd);
-      system(systemListCmd);
-      printf("\n\nEmpty subDirectory received\n\n");
-      // have to send an acknowledgement if subDirectory is present or not
-    }
-    else
-    {
-      sprintf(systemListCmd, "ls -a DFS%d/%s/%s > DFS%d/%s/%s/.%s", portIndex, USERDATA.USERNAME, subDirectory,portIndex, USERDATA.USERNAME, subDirectory,filename);
-      printf("systemListCmd %s\n", systemListCmd);
-      system(systemListCmd);
-      printf("&&&&&&&&&&&&&&&&&&& %s\n", systemListCmd);
-    }
-
-  }
-  char dirToOpenWithUser[100];
-  switch(portIndex)
-  {
-    case 1:
-      strncpy(dfsMainFolder, "DFS1", sizeof("DFS1"));
-      strncpy(dirToOpenWithUser, "./DFS1/", sizeof("./DFS1/"));
-      strncat(dirToOpenWithUser, USERDATA.USERNAME, strlen(USERDATA.USERNAME));
-      //d = opendir(dirToOpenWithUser);
-      //system("mkdir -p DFS1");
-    break;
-    case 2:
-      strncpy(dfsMainFolder, "DFS2", sizeof("DFS2"));
-      strncpy(dirToOpenWithUser, "./DFS2/", sizeof("./DFS2/"));
-      strncat(dirToOpenWithUser, USERDATA.USERNAME, strlen(USERDATA.USERNAME));
-      //d = opendir(dirToOpenWithUser);;
-      //system("mkdir -p DFS2");
-    break;
-    case 3:
-      strncpy(dfsMainFolder, "DFS3", sizeof("DFS3"));
-      strncpy(dirToOpenWithUser, "./DFS3/", sizeof("./DFS3/"));
-      strncat(dirToOpenWithUser, USERDATA.USERNAME, strlen(USERDATA.USERNAME));
-      //d = opendir(dirToOpenWithUser);
-      //system("mkdir -p DFS3");
-    break;
-    case 4:
-      printf("I am coming here\n");
-      strncpy(dfsMainFolder, "DFS4", sizeof("DFS4"));
-      strncpy(dirToOpenWithUser, "./DFS4/", sizeof("./DFS4/"));
-      strncat(dirToOpenWithUser, USERDATA.USERNAME, strlen(USERDATA.USERNAME));
-      //d = opendir(dirToOpenWithUser);
-      //system("mkdir -p DFS4");
-    break;    
-  }
-  if (strcmp(subDirectory,"/") == 0)
-  {
-    printf("\n\nEmpty subDirectory received\n\n");
-    // have to send an acknowledgement if subDirectory is present or not
-  }
-  else
-  {
-    sprintf(dirToOpenWithUser, "%s/%s", dirToOpenWithUser, subDirectory);
-  }
-
-  printf("dirToOpenWithUser %s\n", dirToOpenWithUser);
-  //exit(1);
-  // d = opendir(dirToOpenWithUser);
-  // bzero(dirToOpenWithUser, sizeof(dirToOpenWithUser));
-
-  char filename_dummy[100];
-  bzero(filename_dummy, sizeof(filename_dummy));
-  #if 0
-  strcpy(filename_dummy, filename);
-  #else
-  sprintf(filename_dummy,".%s",filename);
-  #endif
-
-  // copies the current list of files in to the array name[count]
-  //printf("************************************\n");
-  int filerecvBytesus = -5;
-  if (fileNumber != -1)
-  {
-    d = opendir(dirToOpenWithUser);
-    //bzero(dirToOpenWithUser, sizeof(dirToOpenWithUser));
-    if (d)
-    {
-      while ((dir = readdir(d)) != NULL)
-      {
-        
-        //strcpy(name[count],dir->d_name);
-          //printf("dir->d_name: %s %d\n", dir->d_name, sizeof(dir->d_name));
-          //printf("filename_dummy: %s %d\n", filename_dummy, strlen(filename));
-        //printf("%s\n", );
-        if (strncmp(dir->d_name, filename_dummy, strlen(filename)) == 0)
-        {
-          printf(" dir->d_name[strlen(filename) %d\n",  dir->d_name[strlen(filename) + 1]);
-          if ((dir->d_name[strlen(filename) + 2]>=0) &&  (dir->d_name[strlen(filename) + 2]<=3))
-          {
-            strcpy(name[count],dir->d_name);
-            printf("name[count] %s\n", name[count]);
-            count++;
-          }
-        }
-
-      }
-
-      closedir(d);
-    }
-    else
-    {
-      printf("FILE NOT FOUND serious issue\n");
-      //filerecvBytesus = 0;
-    }
+	if(fileNumber == -1){
+		if(strcmp(subDirectory, "/") == 0){
+			sprintf(listCommand, "ls -a DFS%d/%s > DFS%d/%s/.%s", portIndex, USERDATA.USERNAME, portIndex, USERDATA.USERNAME, filename);
+			printf("listCommand %s\n", listCommand);
+			system(listCommand);
+			printf("\n\nEmpty subDirectory received\n\n");
+		}
+		else{
+			sprintf(listCommand, "ls -a DFS%d/%s/%s > DFS%d/%s/%s/.%s", portIndex, USERDATA.USERNAME, subDirectory, portIndex, USERDATA.USERNAME, subDirectory,filename);
+			printf("listCommand %s\n", listCommand);
+			system(listCommand);
+		}
+	}
+	
+	
+	if(portIndex == 1){
+		strncpy(dfsMainFolder, "DFS1", sizeof("DFS1"));
+		strncpy(dfsUserFolder, "./DFS1/", sizeof("./DFS1/"));
+		strncpy(dfsUserFolder, USERDATA.USERNAME, strlen(USERDATA.USERNAME));
+	}
+	else if(portIndex == 2){
+		strncpy(dfsMainFolder, "DFS2", sizeof("DFS2"));
+		strncpy(dfsUserFolder, "./DFS2/", sizeof("./DFS2/"));
+		strncpy(dfsUserFolder, USERDATA.USERNAME, strlen(USERDATA.USERNAME));
+	}
+	else if(portIndex == 3){
+		strncpy(dfsMainFolder, "DFS3", sizeof("DFS3"));
+		strncpy(dfsUserFolder, "./DFS3/", sizeof("./DFS3/"));
+		strncpy(dfsUserFolder, USERDATA.USERNAME, strlen(USERDATA.USERNAME));
+	}
+	else if(portIndex == 4){
+		strncpy(dfsMainFolder, "DFS4", sizeof("DFS4"));
+		strncpy(dfsUserFolder, "./DFS4/", sizeof("./DFS4/"));
+		strncpy(dfsUserFolder, USERDATA.USERNAME, strlen(USERDATA.USERNAME));
+	}
+  
+	if(strcmp(subDirectory,"/") == 0)
+		printf("Sub folder is empty\n");
     
-    if (count == 0)
-    {
-    filerecvBytesus = 0;
-    }
-  }
+	else
+		sprintf(dfsUserFolder, "%s/%s", dfsUserFolder, subDirectory);
 
-  printf("************************************\n");
+	printf("dfsUserFolder: %s\n", dfsUserFolder);
 
   
-  strncat(dfsMainFolder,"/",sizeof("/")); //dfs[]/
-  strncat(dfsMainFolder,USERDATA.USERNAME,sizeof(USERDATA.USERNAME)); //dfs[]/USERNAME
-  strncat(dfsMainFolder,"/",sizeof("/")); //dfs[]/USERNAME/
-  printf("dfsMainFolder %s\n", dfsMainFolder);
-  char fndot[100];
-  bzero(fndot,sizeof(fndot));
-  #if 0
+	bzero(fn, sizeof(fn));
+	#if 0
+		strcpy(fn, filename);
+	#else
+		sprintf(fn,".%s",filename);
+	#endif
+
+	if(fileNumber != -1){
+		directory = opendir(dfsUserFolder);
+ 
+		if(directory){
+			while((dir = readdir(directory)) != NULL){
+				if(strncmp(dir->d_name, fn, strlen(filename)) == 0){
+					if((dir->d_name[strlen(filename)+2] >= 0) &&  (dir->d_name[strlen(filename)+2] <= 3)){
+						strcpy(name[count], dir->d_name);
+						printf("name[count]: %s\n", name[count]);
+						count++;
+					}
+				}
+			}
+			closedir(directory);
+		}
+		else
+			perror("FILE NOT FOUND\n");
+    
+		if(count == 0)
+			status = 0;
+	}
+
+	strncat(dfsMainFolder, "/", sizeof("/"));
+	strncat(dfsMainFolder, USERDATA.USERNAME, sizeof(USERDATA.USERNAME));
+	strncat(dfsMainFolder, "/", sizeof("/"));
+
   
-  strcpy(fndot, name[fileNumber]);  // take care over here
+	bzero(fndot,sizeof(fndot));
+	#if 0
+		strcpy(fndot, name[fileNumber]);
+	#else
+		if (fileNumber != -1)
+		strcat(fndot, name[fileNumber]);
+		else{
+			sprintf(fndot, ".%s", filename);
+			if(strcmp(subDirectory, "/") != 0)
+				sprintf(dfsMainFolder, "%s%s/", dfsMainFolder, subDirectory);
+		}
+	#endif
 
-  #else
-  //strncpy(fndot,".",sizeof("."));
-  if (fileNumber != -1)
-    strcat(fndot, name[fileNumber]);
-  else
-  {
-    sprintf(fndot, ".%s", filename);
-    if (strcmp(subDirectory,"/") == 0)
-      //sprintf(dfsMainFolder,"%s%s/",dfsMainFolder);
-    {
+	
+	//send filename to client
+	printf("Step: Sending filename from server to client\n");  
+	n = send(acceptSock, fndot, sizeof(fndot), 0);
+	if(n < 0)
+		perror("Error sending the filename to client\n");
+  
+	strncat(dfsMainFolder, fndot, sizeof(fndot));
+	bzero(fileExistsCheck, sizeof(fileExistsCheck));
 
-    }
-    else
-      sprintf(dfsMainFolder,"%s%s/",dfsMainFolder, subDirectory);
-  }
-  #endif
+	if(status == 0)
+		perror("FILE NOT FOUND\n");
+	else if(fileNumber >= -1){
+		if(strcmp(subDirectory, "/") == 0)  
+			sprintf(fileExistsCheck, "DFS%d/%s/%s", portIndex, USERDATA.USERNAME,fndot);
+		else
+			sprintf(fileExistsCheck, "DFS%d/%s/%s/%s", portIndex, USERDATA.USERNAME,subDirectory, fndot);
 
-  printf("filename %s\n", filename);
-  printf("fndot%s\n", fndot);
-  // sending the filename from server to client
-  send(sockfd, fndot, sizeof(fndot), 0);
+		if(access(fileExistsCheck, F_OK) != -1){
+			printf("FILE EXISTS\n");
+			status = 1;
+			n = send(acceptSock, (void *)&status, sizeof(int), 0);
+			if(n < 0){
+				perror("Error sending fSize");
+				exit(1);
+			}
+		}
+		else{
+			status = 0;
+			printf("FILE NOT FOUND\n");
+			n = send(acceptSock, (void *)&status, sizeof(int), 0);
+			if(n < 0){
+				perror("Error sending fSize");
+				exit(1);
+			}
+		}
+	}
+	else{
+		status = -1;
+        n = send(acceptSock, (void *)&status, sizeof(int), 0);
+        if(n < 0){
+			perror("Error sending fSize");
+			exit(1);
+        }
+	}
 
-  //printf("********************fndot: %s\n", fndot);
-  strncat(dfsMainFolder,fndot, sizeof(fndot));
-  printf("dfs folder latest%s\n", dfsMainFolder);
-  //exit(1);
-  char checkFileExists[200];
-   bzero(checkFileExists, sizeof(checkFileExists));
-   printf("fileNumber %d\n", fileNumber);
-
-   if (filerecvBytesus == 0)
-   {
-    printf("FILE UNAVAILABLE\n");
-   }
-   else if (fileNumber>=-1)
-   {
-      if (strcmp(subDirectory,"/") == 0)  
-      {
-        sprintf(checkFileExists,"DFS%d/%s/%s",portIndex,USERDATA.USERNAME,fndot);
-      }
-      else
-      {
-        printf("comine gere\n");
-       sprintf(checkFileExists,"DFS%d/%s/%s/%s",portIndex,USERDATA.USERNAME,subDirectory,fndot); 
-      }
-      printf("checkFileExists: %s\n", checkFileExists);
-      if (access (checkFileExists, F_OK) != -1)
-       {
-        printf("FILE EXISTS\n");
-          filerecvBytesus = 1;
-           send(sockfd, (void *)&filerecvBytesus, sizeof(int), 0);
-          if (recvBytes < 0)
-         {
-          perror("Error sending size");
-          exit(1);
-         }
-
-       }
-       else
-       {
-        filerecvBytesus = 0;
-        printf("FILE NOT EXISTS\n");
-           send(sockfd, (void *)&filerecvBytesus, sizeof(int), 0);
-          if (recvBytes < 0)
-         {
-          perror("Error sending size");
-          exit(1);
-         }
-
-       }
-
-   }
-   else
-   {
-    filerecvBytesus = -1;
-               send(sockfd, (void *)&filerecvBytesus, sizeof(int), 0);
-          if (recvBytes < 0)
-         {
-          perror("Error sending size");
-          exit(1);
-         }
-
-   }
-
-   if (filerecvBytesus == 1 || filerecvBytesus == -1)
-   {
-      if (!(picture = fopen(dfsMainFolder, "r"))) 
-      {
-        perror("fopen");
-        //return -1;
-      }    
-      bzero(dfsMainFolder, sizeof(dfsMainFolder));
-       printf("Finding the size of the file using fseek\n"); 
-       
-       fseek(picture, 0, SEEK_END);
-       size = ftell(picture);
-       fseek(picture, 0, SEEK_SET);
-       printf("Total file size is: %d\n",size);
-
-
-       printf("Sending Picture Size from Server to Client\n");
-       send(sockfd, (void *)&size, sizeof(int), 0);
-        if (recvBytes < 0)
-       {
-        perror("Error sending size");
-        exit(1);
-       }
-
-
-      char sendBuf_withpcktSize[BUFLEN];
-
-       while(!feof(picture)) {
-          read_size = fread(send_buffer, 1, sizeof(send_buffer)-1, picture);
-     
-
-          do{
-       
-                recvBytes = send(sockfd, send_buffer, read_size, 0);//, (struct sockaddr *)&clientAddr, sizeof(clientAddr));
-
-      
-          }while (recvBytes < 0);
-
-          printf(" \n");
-          printf(" \n");
-
-
-          //Zero out our send buffer
-          bzero(send_buffer, sizeof(send_buffer));
-          //bzero(sendBuf_withpcktSize, sizeof(sendBuf_withpcktSize));
-         }
-   }
+	if(status == 1 || status == -1){
+		if(!(fp = fopen(dfsMainFolder, "r"))) 
+			perror("Error in opening the file\n");    
+		
+		bzero(dfsMainFolder, sizeof(dfsMainFolder));
+		fSize = getFileSize(fp);
+		printf("The file size is: %d\n", fSize);
+		
+		printf("Step: Sending file from Server to Client\n");
+		n = send(acceptSock, (void *)&fSize, sizeof(int), 0);
+        if(n < 0){
+			perror("Error sending fSize");
+			exit(1);
+		}
+		
+		while(!feof(fp)){
+			readSize = fread(sendBuffer, 1, sizeof(sendBuffer)-1, fp);
+			do{
+                recvBytes = send(acceptSock, sendBuffer, readSize, 0);
+			}while (recvBytes < 0);
+			bzero(sendBuffer, sizeof(sendBuffer));
+        }
+	}
 }
-
-
-
-
 
 
 
@@ -654,7 +530,7 @@ int main(int argc, char **argv){
                     
                     // sending the fp
 
-                    send_image(acceptSock, filenameGet, clientAddress, portIndex, FIRSTFILE);  
+                    sendFile(acceptSock, filenameGet, clientAddress, portIndex, FIRSTFILE);  
                     printf("Exiting the GET_FILE\n");
                     sleep(1);
                     recvBytes = recv(acceptSock, filenameGet, 50,0);
@@ -666,7 +542,7 @@ int main(int argc, char **argv){
                     
                     // sending the fp
 
-                    send_image(acceptSock, filenameGet, clientAddress, portIndex, SECONDFILE);  
+                    sendFile(acceptSock, filenameGet, clientAddress, portIndex, SECONDFILE);  
                     printf("Exiting the GET_FILE\n");
                 }
               }
@@ -690,7 +566,7 @@ int main(int argc, char **argv){
 
 		//------------------------CHOICE == LIST-----------------------------
 		case LIST_FILES:
-			//bzero(systemListCmd, sizeof(systemListCmd));
+			//bzero(listCommand, sizeof(listCommand));
 			if (validateUserDetails(acceptSock))
 			{
 
@@ -702,10 +578,10 @@ int main(int argc, char **argv){
 				perror("Error sending fname");
 				exit(1);
 			  }
-			  // sprintf(systemListCmd, "ls -a DFS%d/%s > DFS%d/%s/.%s", portIndex, USERDATA.USERNAME, portIndex, USERDATA.USERNAME, fileNameList);
-			  // printf("systemListCmd %s\n", systemListCmd);
-			  // system(systemListCmd);
-			  send_image(acceptSock, fileNameList, clientAddress, portIndex, -1); 
+			  // sprintf(listCommand, "ls -a DFS%d/%s > DFS%d/%s/.%s", portIndex, USERDATA.USERNAME, portIndex, USERDATA.USERNAME, fileNameList);
+			  // printf("listCommand %s\n", listCommand);
+			  // system(listCommand);
+			  sendFile(acceptSock, fileNameList, clientAddress, portIndex, -1); 
 			  sleep(1);
 			}
 
