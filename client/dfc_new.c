@@ -628,71 +628,52 @@ int main(int argc, char **argv){
 
 			//------------------------CHOICE == PUT----------------------------------
 			case PUT_FILE:
-				printf("Enter the file name and subfolder you wish to send to\n");
+				printf("Step: PUT\n");
+				printf("Enter the name of the file and subDirectory: ");
 				scanf("%s", putFileName);
 				scanf("%s", subfolder);
-
-				printf("putFileName %s\n", putFileName);
-				printf("subfolder %s\n", subfolder);
-
-				while(1)
-			    {
-			    	if (!(picture = fopen(putFileName, "r"))) 
-			    	{
-			   			perror("fopen");
-						printf("These are the list of files in your folder\n");
-			    		system("ls");	    	
-			    		printf("Re enter the file name\n");
+				
+				while(1){
+			    	if(!(picture = fopen(putFileName, "r"))){
+			   			perror("Error in opening the file");
+						printf("List of files:\n");
+			    		system("ls");
+			    		printf("Enter the file name again\n");
 			    		scanf("%s", putFileName);
 			    	}
-
-			    	else{
+			    	else
 			    		break;
-			    	}
 			    }
 			   	
-			    // computes the md5sum of the file and is excuted on if the valid filename is entered
+			    //Calculate MD5 sum
+				printf("Step: Calculating MD5sum\n");
 			    calculateMd5Sum(putFileName, md5sum);
 				md5sumInt = md5sum[strlen(md5sum)-1] % 4;
-
 				md5sumIndex = (4-md5sumInt)%4;
 				printf("md5sumIndex %d\n", md5sumIndex);
-			    // split -n 4 -a 1 -d [filename] [filename_withindex]
-			    printf("Dividing the file into four equal parts...\n");
+				
+			    //Divide the file using split command
+				printf("Step: Divide the file into four parts\n");
 			    char systemCommand[150];
 			    char filename[100];
 			    bzero(filename, sizeof(filename));
 			    strncpy(filename,putFileName,sizeof(putFileName));
-			    //strncpy(systemCommand, "split -n 4 -a 1 -d ", st("split -n 4 -a 1 -d "));
-			    //strncat(filename, " ", sizeof(" "));
 			    strncpy(filename, putFileName,strlen(putFileName));
 			    sprintf(systemCommand,"split -n 4 -a 1 -d %s en%s",putFileName, putFileName);
-			    //strncat(systemCommand, filename, sizeof(filename));
-			    printf("%s\n", systemCommand);
 			    system(systemCommand);
 
-			    printf("Dividing done\n\n");
-			    printf("Starting Encryption...\n");
-			    printf("\nUSING AES Encryption\n");
+			    //Encryption using AES
+				printf("Step: Encrypting file using AES\n");
 			    char encryptSystemCmd[200];
 			    bzero(encryptSystemCmd,sizeof(encryptSystemCmd));
 			    readConfFile(0);
-			    for (i=0;i<MAX_CONN;i++)
-			    {
-			    	sprintf(encryptSystemCmd,"openssl enc -aes-256-cbc -in en%s%d -out %s%d -k %s", putFileName,i, putFileName, i, PASSWORD);
+			    for (i=0; i<MAX_CONN; i++){
+			    	sprintf(encryptSystemCmd,"openssl enc -aes-256-cbc -in en%s%d -out %s%d -k %s", putFileName, i, putFileName, i, PASSWORD);
 			    	system(encryptSystemCmd);
-			    	printf("%s\n", encryptSystemCmd);
-			    }
+			  	}
 
 			    char filenameWithIndex[4][100];
 			    char fileIndex[1];
-			    // Sending the file to server
-			    /*******************************************
-			    // Formulas for how finalIndex is calculated
-			    // finalIndex = (i+md5sumIndex)%4
-			    // md5sumIndex = (4-md5sumInt)%4;
-			    // md5sumInt = md5sum[strlen(md5sum)-1] % 4;
-			    //*******************************************/
 			    #if 1
 			    	for (i = 0; i< MAX_CONN; i++)
 			    #else
@@ -703,19 +684,20 @@ int main(int argc, char **argv){
 			    	{
 				    	if (sendUserDetails(sockfd[i]))
 				    	{
-					    	//creating the file name with index
-					    	// first file
+					    	//first piece of file
+							printf("Step: Calculating index for first piece of file\n");
 					    	finalIndex = (i+md5sumIndex)%4;
-					    	printf("***********************            %d  %d\n", finalIndex, (finalIndex+1)%4);
 					    	strncpy(filenameWithIndex[finalIndex], putFileName, sizeof(putFileName));
 					    	sprintf(fileIndex,"%d",finalIndex);
 					    	printf("fileIndex  :   %s\n", fileIndex);
 					    	strncat(filenameWithIndex[finalIndex], fileIndex, 1);
 					    	printf("filename %s\n", filenameWithIndex[finalIndex]);
-					    	 
 							sendFile(sockfd[i], filenameWithIndex[finalIndex], serverAddress[i], subfolder);
+							
 							sleep(1);
-							// seconf file
+							
+							//second piece of file
+							printf("Step: Calculating index for second piece of file\n");
 							strncpy(filenameWithIndex[(finalIndex+1)%4], putFileName, sizeof(putFileName));
 					    	sprintf(fileIndex,"%d",(finalIndex+1)%4);
 					    	printf("fileIndex  :   %s\n", fileIndex);
@@ -723,6 +705,7 @@ int main(int argc, char **argv){
 					    	printf("filename %s\n", filenameWithIndex[(finalIndex+1)%4]);
 							sendFile(sockfd[i], filenameWithIndex[(finalIndex+1)%4], serverAddress[i], subfolder);
 							
+							//bzero everything
 							bzero(filenameWithIndex[finalIndex], sizeof(filenameWithIndex[finalIndex]));
 							bzero(filenameWithIndex[(finalIndex+1)%4], sizeof(filenameWithIndex[(finalIndex+1)%4]));
 							bzero(fileIndex, sizeof(fileIndex));
