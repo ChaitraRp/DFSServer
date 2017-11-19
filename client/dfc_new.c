@@ -182,7 +182,7 @@ void readConfFile(int lineLimit){
 
 
 //-------------------------------SEND USER CREDENTIALS------------------------------
-int sendUserDetails(int sockfd1){
+int sendUserCredentials(int sockfd1){
 	int ack;
 	int n;
     readConfFile(0);
@@ -326,9 +326,73 @@ int sendFile(int sockfd, char *fname, struct sockaddr_in serverAddress, char *su
 
 
 //--------------------------------RECEIVE FILE FROM SERVER-----------------------
-int receive_image(int sockfd, char *filename, struct sockaddr_in serverAddress, socklen_t clientlen, char *subDirectory)
-{
+int receiveFile(int sockfd, char *filename, struct sockaddr_in serverAddress, socklen_t clientlen, char *subDirectory){
+	int receivedSize = 0;
+	int recvBytes = 0;
+	int writtenSize = 0;
+	int stat = 0;
+	int fileSize = 1;
+	int status;
+	char receivedFilename[100];
+	char *readBuffer;
+	readBuffer = malloc(300241);
+	FILE *fp;
+  
+	bzero(receivedFilename, sizeof(receivedFilename));
+	printf("Step: Sending subDirectory name");
+	stat = send(sockfd, subDirectory, 100, 0);
+	if(stat < 0)
+		perror("Error in sending subDirectory\n");
 	
+	printf("Step: Receiving filename\n");
+	stat = recv(sockfd, receivedFilename, sizeof(receivedFilename), 0);
+	if(stat < 0)
+		perror("Error in receiving filename\n");
+  
+	printf("Step: Receiving file status\n");
+	stat = recv(sockfd, &status, sizeof(int), 0);
+	if(stat < 0)
+		perror("Error in receiving file status\n");
+	
+	if(status == 0)
+		printf("FILE DOES NOT EXIST ON SERVER\n!");
+  
+	if(status == 1 || status == -1){
+		printf("Step: receiving file size\n");
+		stat = recv(sockfd, &fileSize, sizeof(int), 0);
+		if(stat < 0)
+			perror("Error in receiving file size\n");
+		printf("fileSize: %d\n", fileSize);
+		
+		strncat(receivedFilename, "_received", 100);
+		fp = fopen(receivedFilename, "w");
+		if(fp == NULL){
+			printf("Error has occurred. Image file could not be opened/ created\n");
+			return -1; 
+		}
+
+		//start receiving the file
+		printf("Step: start receiving the file packets\n");
+		while(receivedSize < fileSize) {
+			recvBytes = recv(sockfd, readBuffer, 300241, 0);
+			if(recvBytes == 0){
+				perror("Error in reading file\n");
+				break;
+			}
+			printf("Size of the file: %d\n", fileSize);
+			printf("Number of bytes read now: %d\n", recvBytes);
+			
+			writtenSize = fwrite(readBuffer, 1, recvBytes, fp);
+			printf("Size of the file written: %d", writtenSize); 
+			
+			receivedSize = receivedSize + recvBytes;
+			printf("Total size of the file received so far: %d\n\n", receivedSize);
+		}
+		fclose(fp);
+		return PASS;
+	}
+	else
+		return FAIL;
 }
 
 
@@ -397,207 +461,155 @@ int main(int argc, char **argv){
 		int dummy = 100;
 		switch(option)
 		{
+			//------------------------CHOICE == GET---------------------------------
 			case GET_FILE:
-
-					for (i=0;i<MAX_CONN;i++)
-					{
-						int n = send(sockfd[i], (void *)&dummy, sizeof(int), 0);	
-						if (n < 0)
-						{
-							arrayOfFailedSend[i] = TRUE;
-							perror("Writing to socket: option sending failed");
-						}
-						else
-						{
-							arrayOfFailedSend[i] = FALSE;
-						}
+				for(i=0; i<MAX_CONN; i++){
+					int n = send(sockfd[i], (void *)&dummy, sizeof(int), 0);	
+					if(n < 0){
+						arrayOfFailedSend[i] = TRUE;
+						perror("Error in sending User Choice\n");
 					}
-				// choosing the filename
-				printf("Enter the file name and subfoolder you wish to receive from\n");
+					else
+						arrayOfFailedSend[i] = FALSE;
+				}
+				
+				printf("Enter the filename and sub directory to receive:\n");
 				scanf("%s", filenameGet);
 				scanf("%s", subDirectory);
-				printf("The file name entered is %s\n", filenameGet);
-				printf("subDirectory %s\n", subDirectory);
-
 			
-			    int serverToUse[MAX_CONN ] = {-1,-1,-1,-1};
-			    if (!arrayOfFailedSend[0])
-			    {
-			    	serverToUse[0] = 1;
-			    	if (!arrayOfFailedSend[2])
-			    	//get from 0 and 2 
-			    	{
-			    		serverToUse[2] = 1;
+				printf("Step: Checking for serversForUse[] for optimized get\n");
+			    int serverForUse[MAX_CONN] = {-1,-1,-1,-1};
+			    if(!arrayOfFailedSend[0]){
+			    	serverForUse[0] = TRUE;
+			    	if(!arrayOfFailedSend[2]){
+			    		serverForUse[2] = TRUE;
 			    		printf("COMPLETE 1\n");
 			    	}
-			    	else
-			    	{
-			    		if (!arrayOfFailedSend[1] && !arrayOfFailedSend[3])
-			    		{
-			    			serverToUse[1] = 1;	
-			    			serverToUse[3] = 1;	
+			    	else{
+			    		if(!arrayOfFailedSend[1] && !arrayOfFailedSend[3]){
+			    			serverForUse[1] = TRUE;	
+			    			serverForUse[3] = TRUE;	
 			    		}
-			    		else
-			    		{
+			    		else{
 			    			printf("INCOMPLETE 1\n");
 			    			//goto end_of_get; 
 			    		}
 			    	}
 			    }
-			    else if (!arrayOfFailedSend[1])
-			    {
-			    	serverToUse[1] = 1;
-			    	if (!arrayOfFailedSend[3])
-			    	//get from 1 and 3  
-			    	{
+			    else if(!arrayOfFailedSend[1]){
+			    	serverForUse[1] = TRUE;
+			    	if (!arrayOfFailedSend[3]){
 			    		printf("COMPLETE 2\n");
-			    		serverToUse[3] = 1;
+			    		serverForUse[3] = TRUE;
 			    	}
-			    	else
-			    	{
+			    	else{
 			    		printf("INCOMPLETE 2\n");
 			    		//goto end_of_get; 
 			    	}
 			    }
-			    else
-			    {
+			    else{
 			    	printf("INCOMPLETE 3\n");
 			    	//goto end_of_get;
 			    }
-			    for (i =0;i<MAX_CONN;i++)
-			    {
-			    	printf("%d\n",serverToUse[i]);
-			    }
-			   // exit(1);
-			    // sending packet to notify server to start or not
-			    int youCanSart;
-			    for (i=0;i<MAX_CONN;i++)
-			    {
-			    	if (serverToUse[i] == 1)
-			    	{
-			    		youCanSart = TRUE;
-		    			n = send(sockfd[i], (void *)&youCanSart, sizeof(int), 0);
-						if (n < 0)//, (struct sockaddr *)&servAddr, sizeof(servAddr))==-1)
-						{
-							perror("option sending failed");
-						}
+				
+			    for(i=0; i<MAX_CONN; i++)
+					printf("serverForUse[%d] = %d\n", i, serverForUse[i]);
+				
+				printf("Step: Pre-informing server the status to start sending file\n");
+			    int start;
+			    for(i=0; i<MAX_CONN; i++){
+			    	if(serverForUse[i] == TRUE){
+			    		start = TRUE;
+		    			n = send(sockfd[i], (void *)&start, sizeof(int), 0);
+						if(n < 0)
+							perror("Error in send\n");
 					}
-
-			    	else
-			    	{
-			    		youCanSart = FALSE;
-		    			n = send(sockfd[i], (void *)&youCanSart, sizeof(int), 0);
-						if (n < 0)//, (struct sockaddr *)&servAddr, sizeof(servAddr))==-1)
-						{
+			    	else{
+			    		start = FALSE;
+		    			n = send(sockfd[i], (void *)&start, sizeof(int), 0);
+						if(n < 0)
 							perror("option sending failed");
-						}
-					}					
-				}
-							
-			   #if 1
-			    for (i = 0; i< MAX_CONN; i++)
-			    #else
-			    	for (i = 0; i< 1; i++)
-			   #endif
-			    //tempVali = i;
-
-			    {
-			    	//if (!arrayOfFailedSend[i])
-			    	if (serverToUse[i] == 1)
-			    	{
-			    		printf("**************************************************************************************\n");
-
-			    		if (sendUserDetails(sockfd[i])){
-			    			// receivinf image 1
-					    	n = send(sockfd[i], filenameGet, 50, 0);
-							if (n < 0)//, (struct sockaddr *)&servAddr, sizeof(servAddr))==-1)
-							{
-								perror("option sending failed");
-							}
-							receive_image(sockfd[i], filenameGet, serverAddress[i], serverLength[i], subDirectory);
-							printf("**********************\n");
-							//sleep(1);
-							// receiving image 2
-							n = send(sockfd[i], filenameGet, 50, 0);
-							if (n < 0)//, (struct sockaddr *)&servAddr, sizeof(servAddr))==-1)
-							{
-								perror("option sending failed");
-							}
-							receive_image(sockfd[i], filenameGet, serverAddress[i], serverLength[i], subDirectory);
-							printf("**********************\n");
-						}
-
-						//}
-
 					}
-
-		
 				}
-				//exit(1);
-				for (i = 0;i<MAX_CONN;i++)
+				
+				
+				printf("Step: Sending filenameGet to server\n");
+				#if 1
+			    for(i=0; i<MAX_CONN; i++)
+				#else
+			    	for(i=0; i<1; i++)
+				#endif
 				{
-					serverToUse[i] = -1;
+			    	if(serverForUse[i] == TRUE){
+			    		if(sendUserCredentials(sockfd[i])){
+			    			//send filename 1
+					    	n = send(sockfd[i], filenameGet, 50, 0);
+							if(n < 0)
+								perror("Error in sending filename for get\n");
+							
+							receiveFile(sockfd[i], filenameGet, serverAddress[i], serverLength[i], subDirectory);
+							
+							//sleep(1);
+							
+							//send filename 2
+							n = send(sockfd[i], filenameGet, 50, 0);
+							if(n < 0)
+								perror("Error in sending filename for get\n");
+							receiveFile(sockfd[i], filenameGet, serverAddress[i], serverLength[i], subDirectory);
+						}
+					}
 				}
+				
+				for(i=0; i<MAX_CONN; i++)
+					serverForUse[i] = -1;
 
-				// start of concatenation
 			    char fileLs[100];
-    			char systemLSgetFiles[100];
-    			char decryptSystemCmd[300];
-    			bzero(systemLSgetFiles, sizeof(systemLSgetFiles));
-			    strncpy(systemLSgetFiles, "ls -a .", strlen("ls -a .")); // ls 
-			    strncat(systemLSgetFiles, filenameGet, strlen(filenameGet)); // ls [filename]
-			    strncat(systemLSgetFiles, "*_rec*", strlen("*_rec*"));
-			    char fileList[4][100];
-			    printf("systemLSgetFiles %s\n", systemLSgetFiles);
-			    FILE *f = popen(systemLSgetFiles, "r");
-			    int i = 0;
-			    while (fgets(fileLs, 100, f) != NULL) {
+    			char systemListGetFile[100];
+    			char decryptCommand[300];
+    			char fileList[4][100];
+				int i = 0;
+				
+				bzero(systemListGetFile, sizeof(systemListGetFile));
+			    //This will do: ls -a
+				strncpy(systemListGetFile, "ls -a .", strlen("ls -a ."));
+				 //This will do: ls [filename]
+			    strncat(systemListGetFile, filenameGet, strlen(filenameGet));
+			    strncat(systemListGetFile, "*_rec*", strlen("*_rec*"));
+			    
+			    FILE *filepointer = popen(systemListGetFile, "r");
+			    while(fgets(fileLs, 100, filepointer) != NULL){
 			    	bzero(fileList[i], sizeof(fileList[i]));
-			    	
 					strtok(fileLs,"  \t\n");
-					//printf("fileLs %s\n", fileLs);
 					strncpy(fileList[i], fileLs, sizeof(fileLs));
-			        printf( "%s %lu\n", fileList[i], strlen(fileList[i]) );
 			        i++;
 			    }
-			    pclose(f);
-			    //printf("value of i %d\n", i);
-			    bzero(decryptSystemCmd, sizeof(decryptSystemCmd));
+			    pclose(filepointer);
+				
+			    
+			    bzero(decryptCommand, sizeof(decryptCommand));
 			    readConfFile(0);
-			    if (i<MAX_CONN)
-			    {
+			    if(i < MAX_CONN)
 			    	printf("FILE INCOMPLETE\n");
-			    }
-			    else
-			    {
-			    	char catCommand[300];
-			    	for(i=0;i<MAX_CONN;i++)
-			    	{
-			    		sprintf(decryptSystemCmd,"openssl enc -d -aes-256-cbc -in %s -out de%s -k %s", fileList[i], fileList[i], PASSWORD);
-			    		printf("mama here%s\n", decryptSystemCmd);
-			    		system(decryptSystemCmd);
-			    		//exit(1);
-
-			    	}
+			    else{
+					printf("Step: decrypting\n");
+			    	char catFilePiecesCommand[300];
+			    	for(i=0; i<MAX_CONN; i++){
+						sprintf(decryptCommand, "openssl enc -d -aes-256-cbc -in %s -out de%s -k %s", fileList[i], fileList[i], PASSWORD);
+						system(decryptCommand);
+					}
 			    		
-			    	sprintf(catCommand,"cat de%s de%s de%s de%s > %s_received", fileList[0],fileList[1],fileList[2],fileList[3], filenameGet);
-			    	//printf("wow %s\n", catCommand);
-			    	system(catCommand);
-			    	printf("FILE CONCAT SUCCESSFUL\n");
-			    	bzero(catCommand, sizeof(catCommand));
-			    	system("rm .foo10_received .foo11_received .foo12_received .foo13_received");
+					printf("Step: Concateneting all the files\n");
+			    	sprintf(catFilePiecesCommand, "cat de%s de%s de%s de%s > %s_received", fileList[0],fileList[1],fileList[2],fileList[3], filenameGet);
+			    	system(catFilePiecesCommand);
+			    	bzero(catFilePiecesCommand, sizeof(catFilePiecesCommand));
 			    }
 
-			    bzero(decryptSystemCmd,sizeof(decryptSystemCmd));
-				for (i=0;i<MAX_CONN;i++)
-				{
+			    bzero(decryptCommand, sizeof(decryptCommand));
+				for (i=0; i<MAX_CONN; i++)
 					bzero(fileList[i],sizeof(fileList[i]));
-				}
-				//
-			    // system("rm .foo10_received .foo11_received .foo12_received .foo13_received");
-				//exit(1);
+				
 				//end_of_get:
-				printf("Exiting get function\n");
+				printf("DONE WITH GET\n");
 				break;
 
 
@@ -658,7 +670,7 @@ int main(int argc, char **argv){
 			    {
 			    	if (!arrayOfFailedSend[i])
 			    	{
-				    	if (sendUserDetails(sockfd[i]))
+				    	if (sendUserCredentials(sockfd[i]))
 				    	{
 					    	//first piece of file
 							printf("Step: Calculating index for first piece of file\n");
@@ -688,7 +700,7 @@ int main(int argc, char **argv){
 						}
 					}
 				}
-
+				printf("DONE WITH PUT\n");
 				break;
 
 			// This command gets the list of files form the server in its current directory
@@ -706,7 +718,7 @@ int main(int argc, char **argv){
 					//printf("fileNameList %s\n", fileNameList);
 					if (!arrayOfFailedSend[i])
 					{ 
-						if (sendUserDetails(sockfd[i]))
+						if (sendUserCredentials(sockfd[i]))
 			    		{
 						
 							n = send(sockfd[i], fileNameList, 50, 0);
@@ -715,7 +727,7 @@ int main(int argc, char **argv){
 								perror("option sending failed");
 							}
 							//exit(1);
-							status = receive_image(sockfd[i], fileNameList, serverAddress[i], serverLength[i], subDirectory);
+							status = receiveFile(sockfd[i], fileNameList, serverAddress[i], serverLength[i], subDirectory);
 							if (status == 0)
 							{
 								checkNoCnnections++;

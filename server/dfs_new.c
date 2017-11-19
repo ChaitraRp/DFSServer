@@ -534,7 +534,7 @@ int receiveFile(int sockfd, struct sockaddr_in clientAddress, socklen_t clientSi
     
 	strncat(dfsMainFolder, "/", sizeof("/"));
 	strncat(dfsMainFolder, fndot, sizeof(fndot));
-	printf("DFS Main Folder: %s", dfsMainFolder);
+	printf("DFS Main Folder: %s\n", dfsMainFolder);
 	
 	fp = fopen(dfsMainFolder, "w");
 	if(fp == NULL){
@@ -547,7 +547,7 @@ int receiveFile(int sockfd, struct sockaddr_in clientAddress, socklen_t clientSi
     recvBytes = recv(sockfd, receiveBuffer, 300241, 0);
     writtenBytes = fwrite(receiveBuffer, 1, recvBytes, fp);
     recvSize = recvSize + recvBytes;
-    printf("Total filesize received so far: %d", recvSize);
+    printf("Total filesize received so far: %d\n", recvSize);
 	}
 
 	fclose(fp);
@@ -651,7 +651,7 @@ int main(int argc, char **argv){
                       perror("Error sending fname");
                       exit(1);
                      }
-                    printf("The file name asked for first time is %s\n", filenameGet);
+                    
                     // sending the fp
 
                     send_image(acceptSock, filenameGet, clientAddress, portIndex, FIRSTFILE);  
@@ -663,7 +663,7 @@ int main(int argc, char **argv){
                       perror("Error sending fname");
                       exit(1);
                      }
-                    printf("The file name asked for second time is %s\n", filenameGet);
+                    
                     // sending the fp
 
                     send_image(acceptSock, filenameGet, clientAddress, portIndex, SECONDFILE);  
@@ -705,7 +705,6 @@ int main(int argc, char **argv){
 			  // sprintf(systemListCmd, "ls -a DFS%d/%s > DFS%d/%s/.%s", portIndex, USERDATA.USERNAME, portIndex, USERDATA.USERNAME, fileNameList);
 			  // printf("systemListCmd %s\n", systemListCmd);
 			  // system(systemListCmd);
-			  printf("The file name asked for first time is %s\n", fileNameList);
 			  send_image(acceptSock, fileNameList, clientAddress, portIndex, -1); 
 			  sleep(1);
 			}
