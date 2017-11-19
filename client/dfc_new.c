@@ -77,7 +77,7 @@ char getUserChoice(){
 			printf("\nCommand entered: %s\n", command);
 			break;
 		}
-		else if(strcmp(command, "ls") == 0){
+		else if(strcmp(command, "list") == 0){
 			choice = LIST_FILES;
 			printf("\nCommand entered: %s\n", command);
 			break;
