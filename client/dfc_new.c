@@ -336,10 +336,7 @@ int receive_image(int sockfd, char *filename, struct sockaddr_in serverAddress, 
 
 
 
-int main(int argc, char **argv)
-{
-	
-	//exit(1);
+int main(int argc, char **argv){
 	if (argc < 2) {
      	fprintf(stderr,"configuration file absent\n");
      	exit(1);
@@ -356,23 +353,22 @@ int main(int argc, char **argv)
   	fclose(fp);
   	printf("%s\n", dfcConfigFile);
 
-  	//exit(1);
 	signal(SIGPIPE, SIG_IGN);
 	char md5sum[100];
 	int md5sumInt;
 	int sendFailedArray[MAX_CONN];
 	int listCheck[MAX_CONN] = {0, 0, 0, 0};
 	int dummy = 0;
-	// This function reads server info and user credentials
+	
 	readConfFile(1);
-	// This function create four sockets reading the address from the dsc.conf
+	
 	createSockets();
-	//char *putFileName1;
+	
 	char *subFolder;
 	int i;
 	int option = 0;      
 	char getFileName[20];
-	char putFileName[20];//, putFileName1[50];
+	char putFileName[20];
 	int n;
 	FILE *picture;
 	int j;
@@ -382,46 +378,28 @@ int main(int argc, char **argv)
 	char *val1;
 	char subfolder[50];
 	char fileNameList[10];
-	while(1)
-	{
-		//
-		option = getUserChoice(); // selecting the command received
-		printf("option entered is %d\n", option);
-
-		printf("Option Sent !!\n");
-
+	
+	while(1){
+		option = getUserChoice();
 #if 1
-		for (i=0;i<MAX_CONN;i++)
-		{
-			printf("**Option Sent !!\n");
+		for (i=0;i<MAX_CONN;i++){
 			int n = send(sockfd[i], (void *)&option, sizeof(int), 0);	
-			printf(" ....%d\n", n);
-			if (n < 0)//, 0, (struct sockaddr *)&servAddr, sizeof(servAddr))==-1)
-			{
+			if (n < 0){
 				sendFailedArray[i] = TRUE;
 				perror("Writing to socket: option sending failed");
 			}
-			else
-			{
+			else{
 				sendFailedArray[i] = FALSE;
 			}
 		}
 #else
 			int n = send(sockfd[0], (void *)&option, sizeof(int), 0);	
-			printf(" ....%d\n", n);
-			if (n < 0)//, 0, (struct sockaddr *)&servAddr, sizeof(servAddr))==-1)
-			{
+			if (n < 0)
 				perror("Writing to socket: option sending failed");
-			}
-
 #endif
-		printf("Option Sent !!\n");
-		// Sending the commad to server based on the option received
-		int j;
 		int dummy = 100;
 		switch(option)
 		{
-			// This command gets the file from server
 			case GET_FILE:
 
 					for (i=0;i<MAX_CONN;i++)
@@ -647,16 +625,9 @@ int main(int argc, char **argv)
 				printf("Exiting get function\n");
 				break;
 
-			// This command puts the file onto server
-			// USERNAME send
-			// password send
-			// ack for validity of user credentials receive
-			// size send
-			// filename send
-			// fileContent send
 
+			//------------------------CHOICE == PUT----------------------------------
 			case PUT_FILE:
-
 				printf("Enter the file name and subfolder you wish to send to\n");
 				scanf("%s", putFileName);
 				scanf("%s", subfolder);
