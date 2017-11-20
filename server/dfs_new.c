@@ -143,6 +143,7 @@ int sendFile(int acceptSock, char *filename, struct sockaddr_in clientAddress, i
 		perror("Error in receiving subDirectory name");
 
 
+	//this here is for list command
 	if(fileNumber == -1){
 		if(strcmp(subDirectory, "/") == 0){
 			sprintf(listCommand, "ls -a DFS%d/%s > DFS%d/%s/.%s", portIndex, USERDATA.USERNAME, portIndex, USERDATA.USERNAME, filename);
@@ -151,7 +152,7 @@ int sendFile(int acceptSock, char *filename, struct sockaddr_in clientAddress, i
 			printf("\n\nEmpty subDirectory received\n\n");
 		}
 		else{
-			sprintf(listCommand, "ls -a DFS%d/%s/%s > DFS%d/%s/%s/.%s", portIndex, USERDATA.USERNAME, subDirectory, portIndex, USERDATA.USERNAME, subDirectory,filename);
+			sprintf(listCommand, "ls -a DFS%d/%s/%s > DFS%d/%s/%s/.%s", portIndex, USERDATA.USERNAME, subDirectory, portIndex, USERDATA.USERNAME, subDirectory, filename);
 			printf("listCommand %s\n", listCommand);
 			system(listCommand);
 		}
@@ -220,7 +221,7 @@ int sendFile(int acceptSock, char *filename, struct sockaddr_in clientAddress, i
 	strncat(dfsMainFolder, "/", sizeof("/"));
 	strncat(dfsMainFolder, USERDATA.USERNAME, sizeof(USERDATA.USERNAME));
 	strncat(dfsMainFolder, "/", sizeof("/"));
-
+	printf("dfsMainFolder: %s\n", dfsMainFolder);
   
 	bzero(fndot,sizeof(fndot));
 	#if 0
@@ -230,7 +231,10 @@ int sendFile(int acceptSock, char *filename, struct sockaddr_in clientAddress, i
 		strcat(fndot, name[fileNumber]);
 		else{
 			sprintf(fndot, ".%s", filename);
-			if(strcmp(subDirectory, "/") != 0)
+			if(strcmp(subDirectory, "/") == 0){
+				
+			}
+			else
 				sprintf(dfsMainFolder, "%s%s/", dfsMainFolder, subDirectory);
 		}
 	#endif
@@ -243,6 +247,7 @@ int sendFile(int acceptSock, char *filename, struct sockaddr_in clientAddress, i
 		perror("Error sending the filename to client\n");
   
 	strncat(dfsMainFolder, fndot, sizeof(fndot));
+	printf("dfsMainFolder: %s\n", dfsMainFolder);
 	bzero(fileExistsCheck, sizeof(fileExistsCheck));
 
 	if(status == 0)
@@ -286,7 +291,9 @@ int sendFile(int acceptSock, char *filename, struct sockaddr_in clientAddress, i
 			perror("Error in opening the file\n");    
 		
 		bzero(dfsMainFolder, sizeof(dfsMainFolder));
-		fSize = getFileSize(fp);
+		fseek(fp, 0, SEEK_END);
+		fSize = ftell(fp);
+		fseek(fp, 0, SEEK_SET);
 		printf("The file size is: %d\n", fSize);
 		
 		printf("Step: Sending file from Server to Client\n");
@@ -432,7 +439,7 @@ int receiveFile(int sockfd, struct sockaddr_in clientAddress, socklen_t clientSi
 
 
 
-
+//---------------------------RECEIVE SUB DIRECTORY------------------------------
 int receiveSubDirectory(int sockfd, struct sockaddr_in clientAddress, socklen_t clientSize, int portIndex){
 	int recvBytes = 0;
 	char subDirectory[100];
@@ -546,101 +553,109 @@ int main(int argc, char **argv){
 	printf("Step: Server started\n");
 	listen(sockfd,5);
 	clientSize = sizeof(clientAddress);
-	acceptSock = accept(sockfd,(struct sockaddr *) &clientAddress, &clientSize);
-	if(acceptSock < 0)
-		perror("ERROR on accept");
-
-	for(;;){
-		n = recv(acceptSock, (void *)&option, sizeof(int), 0);
-		if (n < 0)
-			perror("Error in receiving option\n");
 	
-		//--------------------------CHOICE == GET-----------------------------
-		if(option == GET){
-			n = recv(acceptSock, (void *)&dummy, sizeof(int), 0);
-			if(n < 0)
-				perror("Error\n");
-			  
-			n = recv(acceptSock, (void *)&start, sizeof(int), 0);
-			if(n < 0)
-				perror("option receiving failed");
-			  
-			if(start){
-				printf("Step: Receiving filename\n");
-				if(validateUserDetails(acceptSock)){
-					recvBytes = recv(acceptSock, filenameGet, 50,0);
-					if(recvBytes < 0){
-					  perror("Error sending file name\n");
-					  exit(1);
-					}
-					
-					sendFile(acceptSock, filenameGet, clientAddress, portIndex, 0);  
-					sleep(1);
-					
-					recvBytes = recv(acceptSock, filenameGet, 50,0);
-					if (recvBytes < 0){
-					  perror("Error sending file name\n");
-					  exit(1);
-					}
-					
-					sendFile(acceptSock, filenameGet, clientAddress, portIndex, 1);  
-					printf("DONE WITH GET\n");
-				}
-			}	
-		}
-	
-		//------------------------CHOICE == PUT----------------------------------
-		else if(option == PUT){
-			printf("Step: PUT\n");
-			if(validateUserDetails(acceptSock)){ 
-			  //receive first chunk of file
-			  receiveFile(acceptSock, clientAddress, clientSize, portIndex); 
-			  printf("Step: completed put for file chunk 1\n");
-
-			  //receive second chunk of file
-			  receiveFile(acceptSock, clientAddress, clientSize, portIndex); 
-			  printf("Step: completed put for file chunk 2\n");
-			  printf("DONE WITH PUT\n");
-			}
-		}
-		
-		//------------------------CHOICE == LIST-----------------------------
-		else if(option == LIST){
-			if(validateUserDetails(acceptSock)){
-				recvBytes = recv(acceptSock, fileNameList, 50,0);
-				if(recvBytes < 0){
-					perror("Error sending list file");
-					exit(1);
-				} 
-				sendFile(acceptSock, fileNameList, clientAddress, portIndex, -1); 
-				sleep(1);
-			}
-			printf("DONE WITH LIST\n");
-		}
-		
-		//--------------------------CHOICE == MKDIR--------------------------
-		else if(option == MKDIR){
-			printf("Step: MKDIR\n");
-			if(validateUserDetails(acceptSock)){
-				receiveSubDirectory(acceptSock, clientAddress, clientSize, portIndex); 
-			}
-			printf("DONE WITH MKDIR\n");
-		}
-		
-		//--------------------------CHOICE == EXIT---------------------------
-		else if(option == EXIT){
-			printf("Closing the socket\n");
-			close(sockfd);
-			exit(1);
-		}
+	while(1){
+		acceptSock = accept(sockfd,(struct sockaddr *) &clientAddress, &clientSize);
+		if(acceptSock < 0)
+			perror("ERROR on accept");
 		
 		else{
-			printf("Closing the socket\n");
-			close(sockfd);
-			exit(1);
-		}
-		
-		
-    
-	}//end of for
+			if(fork() == 0){
+			for(;;){
+				n = recv(acceptSock, (void *)&option, sizeof(int), 0);
+				if (n < 0)
+					perror("Error in receiving option\n");
+			
+				//--------------------------CHOICE == GET-----------------------------
+				if(option == GET){
+					n = recv(acceptSock, (void *)&dummy, sizeof(int), 0);
+					if(n < 0)
+						perror("error in receiving option\n");
+					  
+					n = recv(acceptSock, (void *)&start, sizeof(int), 0);
+					if(n < 0)
+						perror("option receiving the start status");
+					  
+					if(start){
+						printf("Step: Receiving filename\n");
+						if(validateUserDetails(acceptSock)){
+							recvBytes = recv(acceptSock, filenameGet, 50,0);
+							if(recvBytes < 0){
+							  perror("Error sending file name\n");
+							  exit(1);
+							}
+							
+							printf("Filename to send: %s\n", filenameGet);
+							sendFile(acceptSock, filenameGet, clientAddress, portIndex, 0);  
+							sleep(1);
+							
+							recvBytes = recv(acceptSock, filenameGet, 50,0);
+							if (recvBytes < 0){
+							  perror("Error sending file name\n");
+							  exit(1);
+							}
+							
+							printf("Filename to send: %s\n", filenameGet);
+							sendFile(acceptSock, filenameGet, clientAddress, portIndex, 1);  
+							printf("DONE WITH GET\n");
+						}
+					}	
+				}
+			
+				//------------------------CHOICE == PUT----------------------------------
+				else if(option == PUT){
+					printf("Step: PUT\n");
+					if(validateUserDetails(acceptSock)){ 
+					  //receive first chunk of file
+					  receiveFile(acceptSock, clientAddress, clientSize, portIndex); 
+					  printf("Step: completed put for file chunk 1\n");
+
+					  //receive second chunk of file
+					  receiveFile(acceptSock, clientAddress, clientSize, portIndex); 
+					  printf("Step: completed put for file chunk 2\n");
+					  printf("DONE WITH PUT\n");
+					}
+				}
+				
+				//------------------------CHOICE == LIST-----------------------------
+				else if(option == LIST){
+					if(validateUserDetails(acceptSock)){
+						recvBytes = recv(acceptSock, fileNameList, 50,0);
+						if(recvBytes < 0){
+							perror("Error sending list file");
+							exit(1);
+						} 
+						sendFile(acceptSock, fileNameList, clientAddress, portIndex, -1); 
+						sleep(1);
+					}
+					printf("DONE WITH LIST\n");
+				}
+				
+				//--------------------------CHOICE == MKDIR--------------------------
+				else if(option == MKDIR){
+					printf("Step: MKDIR\n");
+					if(validateUserDetails(acceptSock)){
+						receiveSubDirectory(acceptSock, clientAddress, clientSize, portIndex); 
+					}
+					printf("DONE WITH MKDIR\n");
+				}
+				
+				//--------------------------CHOICE == EXIT---------------------------
+				else if(option == EXIT){
+					printf("GOODBYE!\n");
+					for(int j=0; j<MAX_CONN; j++)
+						close(sockfd);
+					exit(0);
+				}
+				
+				else{
+					printf("GOODBYE!\n");
+					for(int j=0; j<MAX_CONN; j++)
+						close(sockfd);
+					exit(0);
+				}
+			}//end of for
+			}//if(fork())
+		}//else of if(acceptSock)	
+	}//while(1)
 }

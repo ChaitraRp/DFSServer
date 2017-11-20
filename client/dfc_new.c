@@ -122,7 +122,7 @@ void readConfFile(int lineLimit){
     char readBuffer[200];
     char *value;
 
-    fp = fopen("dfc.conf", "r");
+    fp = fopen(dfcConfigFile, "r");
     if(fp == NULL){
         perror("Error in opening dfc.conf file\n");
         exit(1);
@@ -375,7 +375,7 @@ int receiveFile(int sockfd, char *filename, struct sockaddr_in serverAddress, so
 		strncat(receivedFilename, "_received", 100);
 		fp = fopen(receivedFilename, "w");
 		if(fp == NULL){
-			printf("Error has occurred. Image file could not be opened/ created\n");
+			printf("Error in opening file\n");
 			return -1; 
 		}
 
@@ -452,7 +452,8 @@ int main(int argc, char **argv){
         exit(1);
     }
   	fclose(fp);
-
+	
+	//to run code continuously
 	signal(SIGPIPE, SIG_IGN);
 	printf("Step: Reading Config file for Server details\n");
 	readConfFile(1);
@@ -605,24 +606,23 @@ int main(int argc, char **argv){
 			    }
 			    pclose(filepointer);
 				
-			    
 			    bzero(decryptCommand, sizeof(decryptCommand));
 			    readConfFile(0);
-			    if(i < MAX_CONN)
-			    	printf("FILE INCOMPLETE\n");
-			    else{
-					printf("Step: decrypting\n");
-			    	char catFilePiecesCommand[300];
-			    	for(i=0; i<MAX_CONN; i++){
-						sprintf(decryptCommand, "openssl enc -d -aes-256-cbc -in %s -out de%s -k %s", fileList[i], fileList[i], PASSWORD);
-						system(decryptCommand);
-					}
-			    		
-					printf("Step: Concateneting all the files\n");
-			    	sprintf(catFilePiecesCommand, "cat de%s de%s de%s de%s > %s_received", fileList[0],fileList[1],fileList[2],fileList[3], filenameGet);
-			    	system(catFilePiecesCommand);
-			    	bzero(catFilePiecesCommand, sizeof(catFilePiecesCommand));
-			    }
+			    
+				//decryption using openssl aes
+				printf("Step: decrypting\n");
+				char catFilePiecesCommand[300];
+				for(i=0; i<MAX_CONN; i++){
+					sprintf(decryptCommand, "openssl enc -d -aes-256-cbc -in %s -out de%s -k %s", fileList[i], fileList[i], PASSWORD);
+					system(decryptCommand);
+				}
+				
+				//concatenate all the decryted files				
+				printf("Step: Concateneting all the files\n");
+				sprintf(catFilePiecesCommand, "cat de%s de%s de%s de%s > %s_received", fileList[0],fileList[1],fileList[2],fileList[3], filenameGet);
+				system(catFilePiecesCommand);
+				bzero(catFilePiecesCommand, sizeof(catFilePiecesCommand));
+			    system("rm .foo10_received .foo11_received .foo12_received .foo13_received");
 
 			    bzero(decryptCommand, sizeof(decryptCommand));
 				for (i=0; i<MAX_CONN; i++)
@@ -817,10 +817,14 @@ int main(int argc, char **argv){
 
 			case EXIT:
 				printf("GOODBYE!\n");
+				for(int j=0; j<MAX_CONN; j++)
+					close(sockfd[j]);
 				exit(0);
 				
 			default:
 				printf("GOODBYE!\n");
+				for(int j=0; j<MAX_CONN; j++)
+					close(sockfd[j]);
 				exit(0);
 		}
 	}
