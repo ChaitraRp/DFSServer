@@ -433,6 +433,62 @@ int receiveFile(int sockfd, struct sockaddr_in clientAddress, socklen_t clientSi
 
 
 
+int receiveSubDirectory(int sockfd, struct sockaddr_in clientAddress, socklen_t clientSize, int portIndex){
+	int recvBytes = 0;
+	char subDirectory[100];
+	char dfsMainFolder[100];
+	char dfsUserFolder[150];
+	char dfsUsernameAndSubFolder[200];
+
+	printf("Step: Receiving subDirectory\n");
+	recvBytes = recv(sockfd, subDirectory, 100, 0);
+	if (recvBytes < 0)
+		perror("Error in receiving the subDirectory\n");
+	printf("subDirectory: %s\n", subDirectory);
+	
+	printf("Step: Creating DFS MAIN directories\n");
+	if(portIndex == 1){
+		strncpy(dfsMainFolder, "DFS1", sizeof("DFS1"));
+		system("mkdir -p DFS1");
+		strncpy(dfsUserFolder, "mkdir -p DFS1/", strlen("mkdir -p DFS1/"));
+	}
+	else if(portIndex == 2){
+		strncpy(dfsMainFolder, "DFS2", sizeof("DFS2"));
+		system("mkdir -p DFS2");
+		strncpy(dfsUserFolder, "mkdir -p DFS2/", strlen("mkdir -p DFS2/"));
+	}
+	else if(portIndex == 3){
+		strncpy(dfsMainFolder, "DFS3", sizeof("DFS3"));
+		system("mkdir -p DFS3");
+		strncpy(dfsUserFolder, "mkdir -p DFS3/", strlen("mkdir -p DFS3/"));
+	}
+	else if(portIndex == 4){
+		strncpy(dfsMainFolder, "DFS4", sizeof("DFS4"));
+		system("mkdir -p DFS4");
+		strncpy(dfsUserFolder, "mkdir -p DFS4/", strlen("mkdir -p DFS4/"));
+	}
+	
+	printf("Step: Creating USERNAME directory\n");
+	strncat(dfsUserFolder, USERDATA.USERNAME, strlen(USERDATA.USERNAME));
+	system(dfsUserFolder);
+	
+	printf("Step: Creating USERNAME/subdirectory\n");
+	if(strcmp(subDirectory, "/") == 0)
+		printf("Empty subDirectory\n");
+	else{
+		sprintf(dfsUsernameAndSubFolder, "mkdir -p %s/%s", dfsUserFolder, subDirectory);
+		system(dfsUsernameAndSubFolder);
+	}
+  
+	strncat(dfsMainFolder, "/", sizeof("/"));
+	strncat(dfsMainFolder, USERDATA.USERNAME, strlen(USERDATA.USERNAME));
+	return 1;
+}
+
+
+
+
+
 
 
 //----------------------------------MAIN------------------------------------
@@ -536,16 +592,16 @@ int main(int argc, char **argv){
 		//------------------------CHOICE == PUT----------------------------------
 		else if(option == PUT){
 			printf("Step: PUT\n");
-				if(validateUserDetails(acceptSock)){ 
-				  //receive first chunk of file
-				  receiveFile(acceptSock, clientAddress, clientSize, portIndex); 
-				  printf("Step: completed put for file chunk 1\n");
+			if(validateUserDetails(acceptSock)){ 
+			  //receive first chunk of file
+			  receiveFile(acceptSock, clientAddress, clientSize, portIndex); 
+			  printf("Step: completed put for file chunk 1\n");
 
-				  //receive second chunk of file
-				  receiveFile(acceptSock, clientAddress, clientSize, portIndex); 
-				  printf("Step: completed put for file chunk 2\n");
-				  printf("DONE WITH PUT\n");
-				}
+			  //receive second chunk of file
+			  receiveFile(acceptSock, clientAddress, clientSize, portIndex); 
+			  printf("Step: completed put for file chunk 2\n");
+			  printf("DONE WITH PUT\n");
+			}
 		}
 		
 		//------------------------CHOICE == LIST-----------------------------
@@ -565,6 +621,10 @@ int main(int argc, char **argv){
 		//--------------------------CHOICE == MKDIR--------------------------
 		else if(option == MKDIR){
 			printf("Step: MKDIR\n");
+			if(validateUserDetails(acceptSock)){
+				receiveSubDirectory(acceptSock, clientAddress, clientSize, portIndex); 
+			}
+			printf("DONE WITH MKDIR\n");
 		}
 		
 		//--------------------------CHOICE == EXIT---------------------------

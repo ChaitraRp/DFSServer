@@ -404,6 +404,18 @@ int receiveFile(int sockfd, char *filename, struct sockaddr_in serverAddress, so
 }
 
 
+//----------------------------SEND SUB DIRECTORY----------------------------------
+int sendSubDirectory(int sockfd, struct sockaddr_in serverAddress, char *subDirectory){
+	size_t sendBytes;
+	printf("Step: sending subDirectory\n");
+	sendBytes = send(sockfd, subDirectory, 100, 0);
+	if(sendBytes < 0){
+		perror("Error in sending the subDirectory\n");
+		exit(1);
+	}
+}
+
+
 
 
 
@@ -711,7 +723,7 @@ int main(int argc, char **argv){
 				printf("DONE WITH PUT\n");
 				break;
 
-			//------------------------CHOICE == LIST---------------------------------
+			//----------------------CHOICE == LIST-----------------------------
 			case LIST:
 				printf("Step: LIST\n");
 				system("rm .list0_received .list1_received .list2_received .list3_received");
@@ -790,9 +802,17 @@ int main(int argc, char **argv){
 				printf("DONE WITH LIST\n");
 				break;
 				
-			//------------------------CHOICE == MKDIR-------------------------------
+			//--------------------CHOICE == MKDIR----------------------------
 			case MKDIR:
 				printf("Step: MKDIR\n");
+				printf("Enter the name subDirectory: ");
+				scanf("%s", subDirectory);
+				
+				for(i=0; i<MAX_CONN; i++){
+					if (sendUserCredentials(sockfd[i]))
+						sendSubDirectory(sockfd[i], serverAddress[i], subDirectory);
+				}
+				printf("DONE WITH MKDIR\n");
 				break;
 
 			case EXIT:
