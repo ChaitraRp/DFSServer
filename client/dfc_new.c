@@ -50,6 +50,7 @@ void displayMenu(){
 	printf("list: get a list of files on the server\n");
 	printf("put: upload a file to the server\n");
 	printf("get: get a file from the server\n");
+	printf("mkdir: to make subfolder on server\n");
 	printf("exit: close the connection\n");
 	printf("----------------------------------------------\n\n");
 }
@@ -79,6 +80,11 @@ char getUserChoice(){
 		}
 		else if(strcmp(command, "list") == 0){
 			choice = LIST;
+			printf("\nCommand entered: %s\n", command);
+			break;
+		}
+		else if(strcmp(command, "mkdir") == 0){
+			choice = MKDIR;
 			printf("\nCommand entered: %s\n", command);
 			break;
 		}
@@ -464,6 +470,7 @@ int main(int argc, char **argv){
 		switch(option){
 			//------------------------CHOICE == GET---------------------------------
 			case GET:
+				printf("Step: GET\n");
 				for(i=0; i<MAX_CONN; i++){
 					int n = send(sockfd[i], (void *)&dummy, sizeof(int), 0);	
 					if(n < 0){
@@ -706,6 +713,7 @@ int main(int argc, char **argv){
 
 			//------------------------CHOICE == LIST---------------------------------
 			case LIST:
+				printf("Step: LIST\n");
 				system("rm .list0_received .list1_received .list2_received .list3_received");
 				printf("Enter the subfolder\n");
 				scanf("%s", subDirectory);
@@ -781,9 +789,19 @@ int main(int argc, char **argv){
                 fclose(fpoint);
 				printf("DONE WITH LIST\n");
 				break;
-
-			default:
+				
+			//------------------------CHOICE == MKDIR-------------------------------
+			case MKDIR:
+				printf("Step: MKDIR\n");
 				break;
+
+			case EXIT:
+				printf("GOODBYE!\n");
+				exit(0);
+				
+			default:
+				printf("GOODBYE!\n");
+				exit(0);
 		}
 	}
 

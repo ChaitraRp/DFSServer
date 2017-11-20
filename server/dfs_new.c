@@ -562,11 +562,25 @@ int main(int argc, char **argv){
 			printf("DONE WITH LIST\n");
 		}
 		
+		//--------------------------CHOICE == MKDIR--------------------------
+		else if(option == MKDIR){
+			printf("Step: MKDIR\n");
+		}
+		
+		//--------------------------CHOICE == EXIT---------------------------
+		else if(option == EXIT){
+			printf("Closing the socket\n");
+			close(sockfd);
+			exit(1);
+		}
+		
 		else{
 			printf("Closing the socket\n");
 			close(sockfd);
 			exit(1);
 		}
+		
+		
     
 	}//end of for
 }
