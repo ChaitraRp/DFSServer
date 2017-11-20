@@ -18,16 +18,16 @@
 #include <time.h>
 #include <stdlib.h>
 
-#define GET_FILE 1  
-#define PUT_FILE 2
-#define LIST_FILES 3
-#define CLOSE_SOC 4
-
 #define TRUE 1
 #define FALSE 0
-
 #define PASS 1
 #define FAIL 0
+
+#define GET 1
+#define PUT  2
+#define LIST 3
+#define MKDIR 4
+#define EXIT 5
 
 #define MAX_CONN 4
 #define TIMEOUT 1
@@ -68,22 +68,22 @@ char getUserChoice(){
 		scanf("%s", command);
 
 		if(strcmp(command, "get") == 0){
-			choice = GET_FILE;
+			choice = GET;
 			printf("\nCommand entered: %s\n", command);
 			break;
 		}
 		else if(strcmp(command, "put") == 0){
-			choice = PUT_FILE;
+			choice = PUT;
 			printf("\nCommand entered: %s\n", command);
 			break;
 		}
 		else if(strcmp(command, "list") == 0){
-			choice = LIST_FILES;
+			choice = LIST;
 			printf("\nCommand entered: %s\n", command);
 			break;
 		}
 		else if(strcmp(command, "exit") == 0){
-			choice = CLOSE_SOC;
+			choice = EXIT;
 			printf("\nCommand entered: %s\n", command);
 			break;
 		}
@@ -385,7 +385,7 @@ int receiveFile(int sockfd, char *filename, struct sockaddr_in serverAddress, so
 			printf("Number of bytes read now: %d\n", recvBytes);
 			
 			writtenSize = fwrite(readBuffer, 1, recvBytes, fp);
-			printf("Size of the file written: %d", writtenSize); 
+			printf("Size of the file written: %d\n", writtenSize); 
 			
 			receivedSize = receivedSize + recvBytes;
 			printf("Total size of the file received so far: %d\n\n", receivedSize);
@@ -463,7 +463,7 @@ int main(int argc, char **argv){
 		int dummy = 100;
 		switch(option){
 			//------------------------CHOICE == GET---------------------------------
-			case GET_FILE:
+			case GET:
 				for(i=0; i<MAX_CONN; i++){
 					int n = send(sockfd[i], (void *)&dummy, sizeof(int), 0);	
 					if(n < 0){
@@ -616,7 +616,7 @@ int main(int argc, char **argv){
 
 				
 			//------------------------CHOICE == PUT----------------------------------
-			case PUT_FILE:
+			case PUT:
 				printf("Step: PUT\n");
 				printf("Enter the name of the file and subDirectory: ");
 				scanf("%s", filenamePut);
@@ -705,7 +705,7 @@ int main(int argc, char **argv){
 				break;
 
 			//------------------------CHOICE == LIST---------------------------------
-			case LIST_FILES:
+			case LIST:
 				system("rm .list0_received .list1_received .list2_received .list3_received");
 				printf("Enter the subfolder\n");
 				scanf("%s", subDirectory);
@@ -779,6 +779,7 @@ int main(int argc, char **argv){
                         printf("%s [incomplete]\n", fnameLine);
                 }
                 fclose(fpoint);
+				printf("DONE WITH LIST\n");
 				break;
 
 			default:

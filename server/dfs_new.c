@@ -19,10 +19,11 @@
 
 #define BUFLEN 10240
 
-#define GET_FILE 1
-#define PUT_FILE  2
-#define LIST_FILES 3
-#define CLOSE_SOC 4
+#define GET 1
+#define PUT  2
+#define LIST 3
+#define MKDIR 4
+#define EXIT 5
 
 #define VALID 1
 #define INVALID 0
@@ -34,8 +35,6 @@
 
 #define MAX_CONN 4
 #define TIMEOUT 1
-#define FIRSTFILE 0
-#define SECONDFILE 1
 
 typedef struct credentials{
   char USERNAME[100];
@@ -105,7 +104,6 @@ int validateUserDetails(int acceptSock){
 	if(send(acceptSock, &valid, sizeof(int), 0) < 0)
 		perror("Error in sending ack for username and password\n");
 	
-	printf("Is user credential valid?: %d", valid);
 	return valid;
 }
 
@@ -499,105 +497,76 @@ int main(int argc, char **argv){
 	for(;;){
 		n = recv(acceptSock, (void *)&option, sizeof(int), 0);
 		if (n < 0)
-        perror("option receiving failed");
-
-    switch(option){
-		//------------------------CHOICE == GET-----------------------------
-		case GET_FILE:
-              n = recv(acceptSock, (void *)&dummy, sizeof(int), 0);
-              if (n < 0)
-              {
-                perror("option receiving failed");
-                //exit(1);
-              }      
-              
-              n = recv(acceptSock, (void *)&start, sizeof(int), 0);    // Reading the option from user side
-              if (n < 0)
-              {
-                perror("option receiving failed");
-                //exit(1);
-              } 
-              if (start)
-              {
-                printf("receiving the file name\n");
-                  if (validateUserDetails(acceptSock)){
-                    recvBytes = recv(acceptSock, filenameGet, 50,0);
-                     if (recvBytes < 0)
-                     {
-                      perror("Error sending fname");
-                      exit(1);
-                     }
-                    
-                    // sending the fp
-
-                    sendFile(acceptSock, filenameGet, clientAddress, portIndex, FIRSTFILE);  
-                    printf("Exiting the GET_FILE\n");
-                    sleep(1);
-                    recvBytes = recv(acceptSock, filenameGet, 50,0);
-                     if (recvBytes < 0)
-                     {
-                      perror("Error sending fname");
-                      exit(1);
-                     }
-                    
-                    // sending the fp
-
-                    sendFile(acceptSock, filenameGet, clientAddress, portIndex, SECONDFILE);  
-                    printf("Exiting the GET_FILE\n");
-                }
-              }
-          option = 10;
-      break;
-
-		//------------------------CHOICE == PUT-----------------------------
-		case PUT_FILE:
-            printf("Step: PUT\n");
-            if(validateUserDetails(acceptSock)){ 
-              //receive first chunk of file
-              receiveFile(acceptSock, clientAddress, clientSize, portIndex); 
-              printf("Step: completed put for file chunk 1\n");
-
-              //receive second chunk of file
-              receiveFile(acceptSock, clientAddress, clientSize, portIndex); 
-              printf("Step: completed put for file chunk 2\n");
-            }
-            option = 10;
-            break;
-
-		//------------------------CHOICE == LIST-----------------------------
-		case LIST_FILES:
-			//bzero(listCommand, sizeof(listCommand));
-			if (validateUserDetails(acceptSock))
-			{
-
+			perror("Error in receiving option\n");
+	
+		//--------------------------CHOICE == GET-----------------------------
+		if(option == GET){
+			n = recv(acceptSock, (void *)&dummy, sizeof(int), 0);
+			if(n < 0)
+				perror("Error\n");
 			  
-
-			  recvBytes = recv(acceptSock, fileNameList, 50,0);
-			  if (recvBytes < 0)
-			  {
-				perror("Error sending fname");
-				exit(1);
-			  }
-			  // sprintf(listCommand, "ls -a DFS%d/%s > DFS%d/%s/.%s", portIndex, USERDATA.USERNAME, portIndex, USERDATA.USERNAME, fileNameList);
-			  // printf("listCommand %s\n", listCommand);
-			  // system(listCommand);
-			  sendFile(acceptSock, fileNameList, clientAddress, portIndex, -1); 
-			  sleep(1);
-			}
-
-           option = 10;
-			break;
-
-		//------------------------CHOICE == EXIT-----------------------------
-		case CLOSE_SOC:
-			printf("Closing the socket and exiting\n");
-			close(sockfd);   // closing the socket and exiting
-			exit(1);
-			option = 10;
-			break;
-
-		default:
-			break;
+			n = recv(acceptSock, (void *)&start, sizeof(int), 0);
+			if(n < 0)
+				perror("option receiving failed");
+			  
+			if(start){
+				printf("Step: Receiving filename\n");
+				if(validateUserDetails(acceptSock)){
+					recvBytes = recv(acceptSock, filenameGet, 50,0);
+					if(recvBytes < 0){
+					  perror("Error sending file name\n");
+					  exit(1);
+					}
+					
+					sendFile(acceptSock, filenameGet, clientAddress, portIndex, 0);  
+					sleep(1);
+					
+					recvBytes = recv(acceptSock, filenameGet, 50,0);
+					if (recvBytes < 0){
+					  perror("Error sending file name\n");
+					  exit(1);
+					}
+					
+					sendFile(acceptSock, filenameGet, clientAddress, portIndex, 1);  
+					printf("DONE WITH GET\n");
+				}
+			}	
 		}
+	
+		//------------------------CHOICE == PUT----------------------------------
+		else if(option == PUT){
+			printf("Step: PUT\n");
+				if(validateUserDetails(acceptSock)){ 
+				  //receive first chunk of file
+				  receiveFile(acceptSock, clientAddress, clientSize, portIndex); 
+				  printf("Step: completed put for file chunk 1\n");
+
+				  //receive second chunk of file
+				  receiveFile(acceptSock, clientAddress, clientSize, portIndex); 
+				  printf("Step: completed put for file chunk 2\n");
+				  printf("DONE WITH PUT\n");
+				}
+		}
+		
+		//------------------------CHOICE == LIST-----------------------------
+		else if(option == LIST){
+			if(validateUserDetails(acceptSock)){
+				recvBytes = recv(acceptSock, fileNameList, 50,0);
+				if(recvBytes < 0){
+					perror("Error sending list file");
+					exit(1);
+				} 
+				sendFile(acceptSock, fileNameList, clientAddress, portIndex, -1); 
+				sleep(1);
+			}
+			printf("DONE WITH LIST\n");
+		}
+		
+		else{
+			printf("Closing the socket\n");
+			close(sockfd);
+			exit(1);
+		}
+    
 	}//end of for
 }
