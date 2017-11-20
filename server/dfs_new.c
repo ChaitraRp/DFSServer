@@ -69,12 +69,14 @@ int validateUserDetails(int acceptSock){
 	char *unpwd;
 	int valid = FAIL;
 	
+	//username
 	printf("Step: Receiving Username\n");
 	if(recv(acceptSock,USERDATA.USERNAME,100,0) < 0){
 		perror("Error in receiving username\n");
 		exit(1);
 	}
-	
+
+	//password
 	printf("Step: Receiving Password\n");
 	if(recv(acceptSock,USERDATA.PASSWORD,100,0) < 0){
 		perror("Error in receiving password\n");
@@ -87,6 +89,7 @@ int validateUserDetails(int acceptSock){
 		exit(1);
 	}
 	
+	//validation part
 	dfsConfigFileSize = getFileSize(fp);
 	printf("Step: Validating Username and Password\n");
 	while(fgets(fileBuffer,dfsConfigFileSize,fp) != NULL){
@@ -158,7 +161,7 @@ int sendFile(int acceptSock, char *filename, struct sockaddr_in clientAddress, i
 		}
 	}
 	
-	
+	//fetch names of  4 folders
 	if(portIndex == 1){
 		strncpy(dfsMainFolder, "DFS1", sizeof("DFS1"));
 		strncpy(dfsUserFolder, "./DFS1/", sizeof("./DFS1/"));
@@ -180,6 +183,7 @@ int sendFile(int acceptSock, char *filename, struct sockaddr_in clientAddress, i
 		strncpy(dfsUserFolder, USERDATA.USERNAME, strlen(USERDATA.USERNAME));
 	}
   
+	//check for sub directories
 	if(strcmp(subDirectory,"/") == 0)
 		printf("Sub folder is empty\n");
     
@@ -339,18 +343,21 @@ int receiveFile(int sockfd, struct sockaddr_in clientAddress, socklen_t clientSi
 
 	FILE *fp;
 
+	//receive filesize
 	printf("Step: Receiving file size\n");
 	recvBytes = recv(sockfd, &fSize, sizeof(int), 0);
 	if(recvBytes < 0)
 		perror("Error in receiving the file size\n");
 	printf("file size: %d\n", fSize);
 
+	//receive filename
 	printf("Step: Receiving file name\n");
 	recvBytes = recv(sockfd, fname, 100, 0);
 	if(recvBytes < 0)
 		perror("Error in receiving the file name\n");
 	printf("file name: %s\n", fname);
 
+	//receive subdirectory
 	printf("Step: Receiving subDirectory\n");
 	recvBytes = recv(sockfd, subDirectory, 100, 0);
 	if (recvBytes < 0)
@@ -362,7 +369,7 @@ int receiveFile(int sockfd, struct sockaddr_in clientAddress, socklen_t clientSi
 	strncat(fnameReceived, "_recv", 100);
 	bzero(dfsMainFolder, sizeof(dfsMainFolder));
 	
-	
+	//create 4 main directories
 	printf("Step: Creating DFS MAIN directories\n");
 	if(portIndex == 1){
 		strncpy(dfsMainFolder, "DFS1", sizeof("DFS1"));
@@ -385,10 +392,12 @@ int receiveFile(int sockfd, struct sockaddr_in clientAddress, socklen_t clientSi
 		strncpy(dfsUserFolder, "mkdir -p DFS4/", strlen("mkdir -p DFS4/"));
 	}
 	
+	//create username directories
 	printf("Step: Creating USERNAME directory\n");
 	strncat(dfsUserFolder, USERDATA.USERNAME, strlen(USERDATA.USERNAME));
 	system(dfsUserFolder);
 	
+	//create subdirectory
 	printf("Step: Creating USERNAME/subdirectory\n");
 	if(strcmp(subDirectory, "/") == 0)
 		printf("Empty subDirectory\n");
@@ -453,6 +462,7 @@ int receiveSubDirectory(int sockfd, struct sockaddr_in clientAddress, socklen_t 
 		perror("Error in receiving the subDirectory\n");
 	printf("subDirectory: %s\n", subDirectory);
 	
+	//create 4 main directories
 	printf("Step: Creating DFS MAIN directories\n");
 	if(portIndex == 1){
 		strncpy(dfsMainFolder, "DFS1", sizeof("DFS1"));
@@ -475,10 +485,12 @@ int receiveSubDirectory(int sockfd, struct sockaddr_in clientAddress, socklen_t 
 		strncpy(dfsUserFolder, "mkdir -p DFS4/", strlen("mkdir -p DFS4/"));
 	}
 	
+	//create username directory
 	printf("Step: Creating USERNAME directory\n");
 	strncat(dfsUserFolder, USERDATA.USERNAME, strlen(USERDATA.USERNAME));
 	system(dfsUserFolder);
 	
+	//create sub folder
 	printf("Step: Creating USERNAME/subdirectory\n");
 	if(strcmp(subDirectory, "/") == 0)
 		printf("Empty subDirectory\n");
@@ -547,6 +559,7 @@ int main(int argc, char **argv){
 	serverAddress.sin_family = AF_INET;
 	serverAddress.sin_addr.s_addr = INADDR_ANY;
 	serverAddress.sin_port = htons(PORT);
+	
 	if(bind(sockfd, (struct sockaddr *) &serverAddress, sizeof(serverAddress)) < 0) 
 		perror("ERROR on binding");
     
@@ -560,6 +573,7 @@ int main(int argc, char **argv){
 			perror("ERROR on accept");
 		
 		else{
+			//for multiple connections
 			if(fork() == 0){
 			for(;;){
 				n = recv(acceptSock, (void *)&option, sizeof(int), 0);

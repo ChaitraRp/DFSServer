@@ -251,6 +251,7 @@ void createSockets(){
 	    if(connect(sockfd[i],(struct sockaddr *)&serverAddress[i], sizeof(serverAddress[i])) < 0) 
 	    	perror("Error in connecting to the socket\n");
 		
+		
 		struct timeval timeout;      
 	    timeout.tv_sec = TIMEOUT;
 	    timeout.tv_usec = 0;
@@ -290,12 +291,14 @@ int sendFile(int sockfd, char *fname, struct sockaddr_in serverAddress, char *su
 	if(!(fp = fopen(fname, "r")))
 		perror("Error opening the file\n");
 	
+	//filesize
 	printf("Step: Calculating file size\n");
 	fseek(fp, 0, SEEK_END);
 	fSize = ftell(fp);
 	fseek(fp, 0, SEEK_SET);
 	printf("Total file size: %d\n", fSize);
 	
+	//send filesize
 	printf("Step: sending file size to server\n");
 	sendBytes = send(sockfd, &fSize, sizeof(int), 0);
 	if(sendBytes < 0){
@@ -303,6 +306,7 @@ int sendFile(int sockfd, char *fname, struct sockaddr_in serverAddress, char *su
 		exit(1);
 	}
 	
+	//send filename
 	printf("Step: sending filename\n");
 	sendBytes = send(sockfd, fname, 100, 0);
 	if(sendBytes < 0){
@@ -310,6 +314,7 @@ int sendFile(int sockfd, char *fname, struct sockaddr_in serverAddress, char *su
 		exit(1);
 	}
 	
+	//send subdirectory
 	printf("Step: sending subDirectory\n");
 	sendBytes = send(sockfd, subDirectory, 100, 0);
 	if(sendBytes < 0){
@@ -347,16 +352,19 @@ int receiveFile(int sockfd, char *filename, struct sockaddr_in serverAddress, so
 	FILE *fp;
   
 	bzero(receivedFilename, sizeof(receivedFilename));
+	//send subdirectory
 	printf("Step: Sending subDirectory name");
 	stat = send(sockfd, subDirectory, 100, 0);
 	if(stat < 0)
 		perror("Error in sending subDirectory\n");
 	
+	//receive filename
 	printf("Step: Receiving filename\n");
 	stat = recv(sockfd, receivedFilename, sizeof(receivedFilename), 0);
 	if(stat < 0)
 		perror("Error in receiving filename\n");
   
+	//receive filestatus
 	printf("Step: Receiving file status\n");
 	stat = recv(sockfd, &status, sizeof(int), 0);
 	if(stat < 0)
@@ -497,7 +505,8 @@ int main(int argc, char **argv){
 				printf("Enter the filename and sub directory to receive:\n");
 				scanf("%s", filenameGet);
 				scanf("%s", subDirectory);
-			
+				
+				//checking for available servers
 				printf("Step: Checking for serversForUse[] for optimized get\n");
 			    int serverForUse[MAX_CONN] = {-1,-1,-1,-1};
 			    if(!arrayOfFailedSend[0]){
@@ -536,6 +545,7 @@ int main(int argc, char **argv){
 			    for(i=0; i<MAX_CONN; i++)
 					printf("serverForUse[%d] = %d\n", i, serverForUse[i]);
 				
+				//checking for server status
 				printf("Step: Pre-informing server the status to start sending file\n");
 			    int start;
 			    for(i=0; i<MAX_CONN; i++){
@@ -688,10 +698,8 @@ int main(int argc, char **argv){
 			    	for (i=0; i<1; i++)
 			    #endif
 			    {
-			    	if (!arrayOfFailedSend[i])
-			    	{
-				    	if (sendUserCredentials(sockfd[i]))
-				    	{
+			    	if (!arrayOfFailedSend[i]){
+				    	if (sendUserCredentials(sockfd[i])){
 					    	//first piece of file
 							printf("Step: Calculating index for first piece of file\n");
 					    	finalIndex = (i+md5Index)%4;
